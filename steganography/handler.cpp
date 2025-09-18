@@ -18,11 +18,11 @@ void Handler::parseExt(){
     else{file_ext = "INVALID";}
 }
 //----------READING-----------
-std::vector<char> Handler::readFile(){
+bool Handler::readFile(){
     std::ifstream file(file_name, std::ios::binary | std::ios::ate);
     if(!file.is_open()){
         std::cerr << "Error: Could not open " << file_name << std::endl;
-        return binary_file_data;
+        return false;
     }
 
     file_size = file.tellg();
@@ -33,10 +33,10 @@ std::vector<char> Handler::readFile(){
     binary_file_data.resize(file_size); //update buffer size based on file
     if(!file.read(binary_file_data.data(), file_size)){
         std::cerr << "Error: Could not read " << file_name << std::endl;
-        return binary_file_data;
+        return false;
     }
     file.close();
-    return binary_file_data;
+    return true;
 }
 bool Handler::readPng(){
     if (file_ext != ".png"){
@@ -98,6 +98,7 @@ bool Handler::readPng(){
     for (int i = 0; i < png_height; i++){
         row_pointers[i] = &png_pixel_data[i * row_bytes];
     }
+    file_size = png_pixel_data.size();
     png_read_image(png, row_pointers.data());
     png_destroy_read_struct(&png, &png_info, NULL);
     fclose(image_file);
@@ -188,7 +189,9 @@ bool Handler::writePng(const std::string name){
 std::string Handler::getExt() const{
     return file_ext;
 }
-
 std::vector<unsigned char> Handler::getPixelData() const{
     return png_pixel_data;
+}
+std::vector<char> Handler::getFileData() const{
+    return binary_file_data;
 }

@@ -9,12 +9,13 @@ class Handler{
     public:
         Handler(const std::string file_name);
         void parseExt();
-        std::vector<char> readFile(); //DO NOT USE THIS FOR IMAGES
+        bool readFile(); //DO NOT USE THIS FOR IMAGES
         bool writeFile(const std::string name, const std::vector<char> binary);
         bool readPng();
         bool writePng(const std::string name);
         std::string getExt() const;
         std::vector<unsigned char> getPixelData() const;
+        std::vector<char> getFileData() const;
         
     private:
         std::string file_name, file_ext;
