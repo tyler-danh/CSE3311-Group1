@@ -10,7 +10,7 @@ Handler::Handler(std::string file_name){
     parseExt();
 }
 void Handler::parseExt(){
-    //check file extentions of the secret file
+    //check file extentions of the file
     if(file_name.contains(".txt")){file_ext=".txt";}
     else if(file_name.contains(".png")){file_ext=".png";}
     else if(file_name.contains(".jpeg")){file_ext=".jpeg";}
@@ -187,4 +187,8 @@ bool Handler::writePng(const std::string name){
 
 std::string Handler::getExt() const{
     return file_ext;
+}
+
+std::vector<unsigned char> Handler::getPixelData() const{
+    return png_pixel_data;
 }
