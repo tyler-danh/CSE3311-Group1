@@ -9,6 +9,7 @@ class Encoder{
     public:
         Encoder(std::string secret, std::string carrier);
         bool openFiles();
+        bool lsb();
     private:
         std::vector<char> secret_data, carrier_data;
         std::vector<unsigned char> secret_data_unsigned, carrier_data_unsigned;

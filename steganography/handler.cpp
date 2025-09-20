@@ -195,3 +195,6 @@ std::vector<unsigned char> Handler::getPixelData() const{
 std::vector<char> Handler::getFileData() const{
     return binary_file_data;
 }
+std::streamsize Handler::getFileSize() const{
+    return file_size;
+}

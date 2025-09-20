@@ -16,6 +16,7 @@ class Handler{
         std::string getExt() const;
         std::vector<unsigned char> getPixelData() const;
         std::vector<char> getFileData() const;
+        std::streamsize getFileSize() const;
         
     private:
         std::string file_name, file_ext;
