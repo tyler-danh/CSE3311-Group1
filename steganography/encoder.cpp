@@ -44,11 +44,35 @@ bool Encoder::openFiles(){
 }
 
 bool Encoder::lsb(){
-    std::streamsize required_bytes = secret_file.getFileSize() * 8;
-    if(required_bytes >= carrier_file.getFileSize()){
+    std::streamsize secret_size = secret_file.getFileSize();
+    //datasize of the file size + actual file size * 8
+    std::streamsize required_bytes = (sizeof(secret_size) + secret_file.getFileSize()) * 8;
+    if(required_bytes > carrier_file.getFileSize()){
         std::cout << "Error: Secret file is too large." << std::endl;
         return false;
     }
-    std::cout << "lsb\n";
+    std::streamsize offset = 0;
+    //encode datasize of file first
+    unsigned char* secret_size_bytes = reinterpret_cast<unsigned char*>(&secret_size);
+    for (std::streamsize i = 0; i < sizeof(secret_size); ++i){
+        for (int j = 0; j < 8; ++j){
+            unsigned char bit = (secret_size_bytes[i] >> j) & 1;
+            carrier_data[offset] &= 0xFE;
+            carrier_data[offset] |= bit;
+            offset++;
+        }
+    }
+    //now encode file data
+    for (unsigned char file_byte : secret_data){
+        for (int j = 0; j < 8; ++j){
+            unsigned char bit = (file_byte >> j) & 1;
+            carrier_data[offset] &= 0xFE;
+            carrier_data[offset] |= bit;
+            offset++;
+        }
+    }
+    //now update Handler carrier_file obj with encoded pixel data and write new png
+    carrier_file.setPngPixelData(carrier_data);
+    carrier_file.writePng("dolphin2.png");
     return true;
 }

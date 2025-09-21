@@ -88,6 +88,8 @@ bool Handler::readPng(){
     if(color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
         png_set_gray_to_rgb(png);
 
+    std::cout << std::to_string(color_type);
+
     png_read_update_info(png, png_info);
 
     //now read image data into png_pixel_data and close file
@@ -183,8 +185,11 @@ bool Handler::writePng(const std::string name){
     fclose(image_file);
     return true;
 }
-
-//----------GETTERS----------
+//----------SETTERS----------//
+void Handler::setPngPixelData(std::vector<unsigned char> pixel_data){
+    png_pixel_data = pixel_data;
+}
+//----------GETTERS----------//
 
 std::string Handler::getExt() const{
     return file_ext;

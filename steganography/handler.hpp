@@ -13,6 +13,7 @@ class Handler{
         bool writeFile(const std::string name, const std::vector<char> binary);
         bool readPng();
         bool writePng(const std::string name);
+        void setPngPixelData(std::vector<unsigned char> pixel_data);
         std::string getExt() const;
         std::vector<unsigned char> getPixelData() const;
         std::vector<unsigned char> getFileData() const;
