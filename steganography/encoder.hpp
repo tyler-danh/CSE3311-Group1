@@ -11,8 +11,7 @@ class Encoder{
         bool openFiles();
         bool lsb();
     private:
-        std::vector<char> secret_data, carrier_data;
-        std::vector<unsigned char> secret_data_unsigned, carrier_data_unsigned;
+        std::vector<unsigned char> secret_data, carrier_data;
         bool secret_check, carrier_check;
         Handler secret_file, carrier_file;
 };

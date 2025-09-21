@@ -19,11 +19,12 @@ bool Encoder::openFiles(){
     }
     else if(secret_file.getExt() == ".png"){
         secret_check = secret_file.readPng();
-        secret_data_unsigned = secret_file.getPixelData();
+        secret_data = secret_file.getPixelData();
     }
+    //only checks png files, other files with a valid secret will still pass
     if(carrier_file.getExt() == ".png"){
         carrier_check = carrier_file.readPng();
-        carrier_data_unsigned = carrier_file.getPixelData();
+        carrier_data = carrier_file.getPixelData();
     }
     if (secret_check == false or carrier_check == false){
         if (secret_check == false and carrier_check == false){
@@ -43,8 +44,9 @@ bool Encoder::openFiles(){
 }
 
 bool Encoder::lsb(){
-    if(secret_file.getFileSize() > carrier_file.getFileSize()){
-        std::cout << "Error: Secret file is larger than Carrier file." << std::endl;
+    std::streamsize required_bytes = secret_file.getFileSize() * 8;
+    if(required_bytes >= carrier_file.getFileSize()){
+        std::cout << "Error: Secret file is too large." << std::endl;
         return false;
     }
     std::cout << "lsb\n";

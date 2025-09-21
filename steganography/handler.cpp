@@ -31,7 +31,7 @@ bool Handler::readFile(){
     //open and move pos to end, check pos for filesize, then move to beg
 
     binary_file_data.resize(file_size); //update buffer size based on file
-    if(!file.read(binary_file_data.data(), file_size)){
+    if(!file.read(reinterpret_cast<char*>(binary_file_data.data()), file_size)){
         std::cerr << "Error: Could not read " << file_name << std::endl;
         return false;
     }
@@ -192,7 +192,7 @@ std::string Handler::getExt() const{
 std::vector<unsigned char> Handler::getPixelData() const{
     return png_pixel_data;
 }
-std::vector<char> Handler::getFileData() const{
+std::vector<unsigned char> Handler::getFileData() const{
     return binary_file_data;
 }
 std::streamsize Handler::getFileSize() const{

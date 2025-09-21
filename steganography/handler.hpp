@@ -15,12 +15,12 @@ class Handler{
         bool writePng(const std::string name);
         std::string getExt() const;
         std::vector<unsigned char> getPixelData() const;
-        std::vector<char> getFileData() const;
+        std::vector<unsigned char> getFileData() const;
         std::streamsize getFileSize() const;
         
     private:
         std::string file_name, file_ext;
-        std::vector<char> binary_file_data; //NOT TO BE USED FOR IMAGES!!!
+        std::vector<unsigned char> binary_file_data; //NOT TO BE USED FOR IMAGES!!!
         std::vector<unsigned char> png_pixel_data;
         std::streamsize file_size;
         int png_width, png_height, jpeg_width, jpeg_height = 0;
