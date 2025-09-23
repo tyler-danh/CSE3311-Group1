@@ -8,7 +8,7 @@ Encoder::Encoder(std::string secret, std::string carrier)
     :   secret_file(secret),
         carrier_file(carrier)
 {
-    std::cout << "Encoder ready." << std::endl;
+    std::cout << "Console: Initializing Encoder..." << std::endl;
 }
 bool Encoder::openFiles(){
     //open both files and get their data
@@ -40,10 +40,11 @@ bool Encoder::openFiles(){
             return false;
         }
     }
+    std::cout << "Console: Encoder ready" << std::endl;
     return true;
 }
 
-bool Encoder::lsb(){
+bool Encoder::lsb(std::string newFile){
     std::streamsize secret_size = secret_file.getFileSize();
     //datasize of the file size + actual file size * 8
     std::streamsize required_bytes = (sizeof(secret_size) + secret_file.getFileSize()) * 8;
@@ -73,6 +74,6 @@ bool Encoder::lsb(){
     }
     //now update Handler carrier_file obj with encoded pixel data and write new png
     carrier_file.setPngPixelData(carrier_data);
-    carrier_file.writePng("dolphin2.png");
+    carrier_file.writePng(newFile);
     return true;
 }
