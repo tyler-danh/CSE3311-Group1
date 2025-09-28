@@ -105,14 +105,14 @@ bool Handler::readPng(){
     return true;
 }
 //----------WRITING----------
-bool Handler::writeFile(const std::string name, const std::vector<char> binary){
+bool Handler::writeFile(const std::string name){
     std::ofstream file(name, std::ios::binary);
     if(!file.is_open()){
         std::cerr << "Error: Could not open " << name << std::endl;
         return false;
     }
 
-    file.write(binary.data(), binary.size());
+    file.write(reinterpret_cast<const char*>(binary_file_data.data()), binary_file_data.size());
 
     if(!file.good()){
         std::cerr << "Error: Failed to write to " << name << std::endl;
@@ -186,6 +186,9 @@ bool Handler::writePng(const std::string name){
 //----------SETTERS----------//
 void Handler::setPngPixelData(std::vector<unsigned char> pixel_data){
     png_pixel_data = pixel_data;
+}
+void Handler::setBinaryFileData(std::vector<unsigned char> file_data){
+    binary_file_data = file_data;
 }
 //----------GETTERS----------//
 

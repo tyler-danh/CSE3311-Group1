@@ -44,16 +44,37 @@ bool Encoder::openFiles(){
     return true;
 }
 
-bool Encoder::lsb(std::string newFile){
+bool Encoder::pngLsb(std::string newFile){
+    std::string secret_ext = secret_file.getExt(); 
     std::streamsize secret_size = secret_file.getFileSize();
-    //datasize of the file size + actual file size * 8
-    std::streamsize required_bytes = (sizeof(secret_size) + secret_file.getFileSize()) * 8;
+    //ext len + ext chars + datasize of the file size + actual file size * 8
+    std::streamsize required_bytes = (1 + secret_ext.length() + secret_size + secret_file.getFileSize()) * 8;
     if(required_bytes > carrier_file.getFileSize()){
         std::cout << "Error: Secret file is too large." << std::endl;
         return false;
     }
+
     std::streamsize offset = 0;
-    //encode datasize of file first
+    //encode size of file ext first
+    //i use 'j' for for loops nested in another for loop - td
+    uint8_t secret_ext_len = static_cast<uint8_t>(secret_ext.length());
+    for (int i = 0; i < 8; ++i){
+        unsigned char bit = (secret_ext_len >> i) & 1;
+        carrier_data[offset] &= 0xFE;
+        carrier_data[offset] |= bit;
+        offset++;
+    }
+    //encode secret file's ext for when we decode
+    for (char c : secret_ext){
+        for (int j = 0; j < 8; ++j){
+            c = static_cast<unsigned char>(c);
+            unsigned char bit = (c >> j) & 1;
+            carrier_data[offset] &= 0xFE;
+            carrier_data[offset] |= bit;
+            offset++;
+        }
+    }
+    //encode datasize of file next
     unsigned char* secret_size_bytes = reinterpret_cast<unsigned char*>(&secret_size);
     for (std::streamsize i = 0; i < sizeof(secret_size); ++i){
         for (int j = 0; j < 8; ++j){

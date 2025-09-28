@@ -10,10 +10,11 @@ class Handler{
         Handler(const std::string file_name);
         void parseExt();
         bool readFile(); //DO NOT USE THIS FOR IMAGES
-        bool writeFile(const std::string name, const std::vector<char> binary);
+        bool writeFile(const std::string name);
         bool readPng();
         bool writePng(const std::string name);
         void setPngPixelData(std::vector<unsigned char> pixel_data);
+        void setBinaryFileData(std::vector<unsigned char> file_data);
         std::string getExt() const;
         std::vector<unsigned char> getPixelData() const;
         std::vector<unsigned char> getFileData() const;
