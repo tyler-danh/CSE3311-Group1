@@ -45,7 +45,13 @@ bool Encoder::openFiles(){
 }
 
 bool Encoder::pngLsb(std::string newFile){
-    std::string secret_ext = secret_file.getExt(); 
+    std::string secret_ext = secret_file.getExt();
+    int secret_height, secret_width = 0;
+    if (secret_ext == ".png" or secret_ext == ".jpeg" or secret_ext == ".jpg"){
+        secret_height = secret_file.getImageDimensions(0);
+        secret_width = secret_file.getImageDimensions(1);
+        std::cout << "Secret Height: " << secret_height << std::endl << "Secret Width " << secret_width << std::endl;
+    } 
     std::streamsize secret_size = secret_file.getFileSize();
     //ext len + ext chars + datasize of the file size + actual file size * 8
     std::streamsize required_bytes = (1 + secret_ext.length() + secret_size + secret_file.getFileSize()) * 8;
@@ -72,6 +78,30 @@ bool Encoder::pngLsb(std::string newFile){
             carrier_data[offset] &= 0xFE;
             carrier_data[offset] |= bit;
             offset++;
+        }
+    }
+    if (secret_ext == ".png" or secret_ext == ".jpeg" or secret_ext == ".jpg"){
+        //encode the image's dimensions
+        //height first
+        //width next
+        unsigned char* secret_height_bytes = reinterpret_cast<unsigned char*>(&secret_height);
+        for (std::streamsize i = 0; i < sizeof(secret_height); ++i){
+            for (int j = 0; j < 8; ++j){
+                unsigned char bit = (secret_height_bytes[i] >> j) & 1;
+                carrier_data[offset] &= 0xFE;
+                carrier_data[offset] |= bit;
+                offset++;
+            }
+        }
+
+        unsigned char* secret_width_bytes = reinterpret_cast<unsigned char*>(&secret_width);
+        for (std::streamsize i = 0; i < sizeof(secret_width); ++i){
+            for (int j = 0; j < 8; ++j){
+                unsigned char bit = (secret_width_bytes[i] >> j) & 1;
+                carrier_data[offset] &= 0xFE;
+                carrier_data[offset] |= bit;
+                offset++;
+            }
         }
     }
     //encode datasize of file next

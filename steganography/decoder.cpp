@@ -28,6 +28,7 @@ bool Decoder::pngDecode(std::string newFile){
     std::streamsize offset = 0;
     uint8_t ext_len = 0;
     unsigned char extracted_byte = 0;
+    int height, width = 0;
 
     //first get ext_len
     for (int i = 0; i < 8; ++i){
@@ -55,6 +56,33 @@ bool Decoder::pngDecode(std::string newFile){
     }
     std::cout << "Console: Succesfully extracted file extension: " << file_ext << std::endl;
 
+    //extract image dimensions if extracted extension is a supported image
+    if (file_ext == ".png" or file_ext == ".jpeg" or file_ext == ".jpg"){
+        std::cout << "Console: Image detected. Extracting dimensions." << std::endl;
+        unsigned char* height_bytes = reinterpret_cast<unsigned char*>(&height);
+        for (int i = 0; i < sizeof(height); ++i){
+            for (int j = 0; j < 8; ++j){
+                unsigned char bit = file_data[offset] & 1;
+                extracted_byte |= (bit << j);
+                offset++;
+            }
+            height_bytes[i] = extracted_byte;
+            extracted_byte = 0;
+        }
+        std::cout << "Console: Extracted height: " << height << std::endl;
+
+        unsigned char* width_bytes = reinterpret_cast<unsigned char*>(&width);
+        for (int i = 0; i < sizeof(width); ++i){
+            for (int j = 0; j < 8; ++j){
+                unsigned char bit = file_data[offset] & 1;
+                extracted_byte |= (bit << j);
+                offset++;
+            }
+            width_bytes[i] = extracted_byte;
+            extracted_byte = 0;
+        }
+        std::cout << "Console: Extracted width: " << width << std::endl;
+    }
     //extract data size
     uint32_t data_size = 0;
     unsigned char* size_bytes = reinterpret_cast<unsigned char*>(&data_size);
@@ -98,6 +126,8 @@ bool Decoder::pngDecode(std::string newFile){
     }
     else if (file_ext == ".png"){
         encodedFile.setPngPixelData(extracted_data);
+        encodedFile.setImageDimensions(0, height);
+        encodedFile.setImageDimensions(1, width);
         newFile = newFile + file_ext;
         if (!encodedFile.writePng(newFile)){
             std::cerr << "Error: Failed to write to " << newFile << std::endl;

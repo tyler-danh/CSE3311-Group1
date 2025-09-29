@@ -73,8 +73,8 @@ bool Handler::readPng(){
     png_init_io(png, image_file); //usage is png_init_io(png_structrp png_ptr, FILE *fp)
     png_read_info(png, png_info);
     //read image info
-    png_height = png_get_image_height(png, png_info);
-    png_width = png_get_image_width(png, png_info);
+    image_height = png_get_image_height(png, png_info);
+    image_width = png_get_image_width(png, png_info);
     png_byte color_type = png_get_color_type(png, png_info);
     png_byte bit_depth = png_get_bit_depth(png, png_info);
 
@@ -92,10 +92,10 @@ bool Handler::readPng(){
 
     //now read image data into png_pixel_data and close file
     int row_bytes = png_get_rowbytes(png, png_info);
-    png_pixel_data.resize(row_bytes * png_height);
+    png_pixel_data.resize(row_bytes * image_height);
 
-    std::vector<png_bytep> row_pointers(png_height);
-    for (int i = 0; i < png_height; i++){
+    std::vector<png_bytep> row_pointers(image_height);
+    for (int i = 0; i < image_height; i++){
         row_pointers[i] = &png_pixel_data[i * row_bytes];
     }
     file_size = png_pixel_data.size();
@@ -155,9 +155,9 @@ bool Handler::writePng(const std::string name){
         return false;
     }
     //ensure image data aligns with image dimensions during read
-    if (png_pixel_data.size() != (size_t)png_width * png_height * 4) {
+    if (png_pixel_data.size() != (size_t)image_width * image_height * 4) {
         std::cerr << "CRITICAL ERROR: Data size does not match dimensions!" << std::endl;
-        std::cerr << "Expected size: " << (size_t)png_width * png_height * 4 << std::endl;
+        std::cerr << "Expected size: " << (size_t)image_width * image_height * 4 << std::endl;
         std::cerr << "Actual size:   " << png_pixel_data.size() << std::endl;
         png_destroy_write_struct(&png, &png_info);
         fclose(image_file);
@@ -166,14 +166,14 @@ bool Handler::writePng(const std::string name){
 
     png_init_io(png, image_file);
     //write png headers
-    png_set_IHDR(png, png_info, png_width, png_height, 8, PNG_COLOR_TYPE_RGBA,
+    png_set_IHDR(png, png_info, image_width, image_height, 8, PNG_COLOR_TYPE_RGBA,
         PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
     png_write_info(png, png_info);
 
     //write image data and close file
-    int row_bytes = png_width * 4;
-    std::vector<png_bytep> row_pointers(png_height);
-    for(int i = 0; i < png_height; ++i){
+    int row_bytes = image_width * 4;
+    std::vector<png_bytep> row_pointers(image_height);
+    for(int i = 0; i < image_height; ++i){
         row_pointers[i] = const_cast<png_bytep>(&png_pixel_data[i * row_bytes]);
     }
     png_write_image(png, row_pointers.data());
@@ -190,6 +190,10 @@ void Handler::setPngPixelData(std::vector<unsigned char> pixel_data){
 void Handler::setBinaryFileData(std::vector<unsigned char> file_data){
     binary_file_data = file_data;
 }
+void Handler::setImageDimensions(int selector, int dimension){
+    if (selector == 0){image_height = dimension;}
+    else{image_width = dimension;}
+}
 //----------GETTERS----------//
 
 std::string Handler::getExt() const{
@@ -204,3 +208,8 @@ std::vector<unsigned char> Handler::getFileData() const{
 std::streamsize Handler::getFileSize() const{
     return file_size;
 }
+int Handler::getImageDimensions(int selector) const{
+    if (selector == 0){return image_height;}
+    else{return image_width;}
+}
+
