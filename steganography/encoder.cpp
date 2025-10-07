@@ -2,12 +2,15 @@
 #include <vector>
 #include "encoder.hpp"
 #include "handler.hpp"
+#include <jpeglib.h>
 
 Encoder::Encoder(std::string secret, std::string carrier)
 //constructor has an init list that create Handler object to handle input files
     :   secret_file(secret),
         carrier_file(carrier)
 {
+    this->secret_name = secret;
+    this->carrier_name = carrier;
     std::cout << "Console: Initializing Encoder..." << std::endl;
 }
 bool Encoder::openFiles(){
@@ -21,11 +24,13 @@ bool Encoder::openFiles(){
         secret_check = secret_file.readPng();
         secret_data = secret_file.getPixelData();
     }
-    //only checks png files, other files with a valid secret will still pass
+    else if(secret_file.getExt() == ".jpeg" or secret_file.getExt() == ".jpg"){secret_check = true;}
+    //only checks png & jpeg files, other files with a valid secret will still pass
     if(carrier_file.getExt() == ".png"){
         carrier_check = carrier_file.readPng();
         carrier_data = carrier_file.getPixelData();
     }
+    else if(carrier_file.getExt() == ".jpeg" or carrier_file.getExt() == ".jpg"){carrier_check = true;}
     if (secret_check == false or carrier_check == false){
         if (secret_check == false and carrier_check == false){
             std::cerr << "Error: Failed to open secret file and carrier file" << std::endl;
@@ -128,3 +133,120 @@ bool Encoder::pngLsb(std::string newFile){
     carrier_file.writePng(newFile);
     return true;
 }
+
+bool Encoder::dctJpeg(std::string newFile){
+    //intercepting compression process midway
+    //file handling, reading and writing will have to be done here
+    //setup decompression
+    struct jpeg_decompress_struct decompress_info;
+    struct jpeg_error_mgr jpeg_error;
+    decompress_info.err = jpeg_std_error(&jpeg_error);
+
+    if(carrier_check == false){
+        std::cerr << "Error: Carrier file not valid" << std::endl;
+        return false;
+    }
+    FILE* jpeg_file = fopen(carrier_name.c_str(), "rb");
+    if(!jpeg_file){
+        std::cerr << "Error: " << carrier_name << " failed to open" << std::endl;
+        return false;
+    }
+
+    jpeg_create_decompress(&decompress_info);
+    jpeg_stdio_src(&decompress_info, jpeg_file);
+    jpeg_read_header(&decompress_info, TRUE);
+
+    //read coefficients for DCT
+    jvirt_barray_ptr* coefficients = jpeg_read_coefficients(&decompress_info);
+    if (!coefficients){
+        std::cerr << "Error: Failed to read JPEG coefficients." << std::endl;
+        return false;
+    }
+
+    //setup compression
+    struct jpeg_compress_struct compress_info;
+    compress_info.err = jpeg_std_error(&jpeg_error);
+    jpeg_create_compress(&compress_info);
+    FILE* output_file = fopen(newFile.c_str(), "wb");
+    if (!output_file){
+        std::cerr << "Failed to open " << newFile << "for writing JPEG" << std::endl;
+        return false;
+    }
+    jpeg_stdio_dest(&compress_info, output_file);
+    jpeg_copy_critical_parameters(&decompress_info, &compress_info);
+
+    //build the payload: ext + size + file_data
+    //if its an image: ext + height + width + size + file_data
+    std::vector<unsigned char> secret_payload;
+    std::string secret_ext = secret_file.getExt();
+    std::uint8_t ext_len = static_cast<uint8_t>(secret_ext.length());
+    uint32_t secret_size = secret_data.size();
+    unsigned char* size_bytes = reinterpret_cast<unsigned char*>(&secret_size);
+
+    secret_payload.push_back(ext_len);
+    secret_payload.insert(secret_payload.end(), secret_ext.begin(), secret_ext.end());
+    secret_payload.insert(secret_payload.end(), size_bytes, size_bytes + sizeof(secret_size));
+    secret_payload.insert(secret_payload.end(), secret_data.begin(), secret_data.end());
+
+    //encoding logic
+    size_t data_byte_index = 0;
+    int data_bit_index = 0;
+    bool finished_enc = false;
+
+    //iterate through jpeg components (Y, Cb, Cr), blocks and coefficients
+    for (int comp_i = 0; comp_i < decompress_info.num_components && !finished_enc; ++comp_i) {
+        for (int block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks && !finished_enc; ++block_y) {
+            JBLOCKARRAY block_array = (decompress_info.mem->access_virt_barray)((j_common_ptr)&decompress_info, coefficients[comp_i], block_y, 1, FALSE);
+            for (int block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks && !finished_enc; ++block_x) {
+                //each block has 64 coefficients
+                for (int i = 0; i < DCTSIZE2; ++i) {
+                    JCOEF* coef_ptr = &block_array[0][block_x][i];
+
+                    //Steg Rule: only embed in coefficients that are not 0 or 1
+                    if (*coef_ptr != 0 && *coef_ptr != 1) {
+                        //get the current bit to hide
+                        unsigned char current_byte = secret_payload[data_byte_index];
+                        int bit_to_hide = (current_byte >> data_bit_index) & 1;
+                        
+                        //clear lsb and set it to our bit
+                        *coef_ptr = (*coef_ptr & ~1) | bit_to_hide;
+
+                        //move to the next bit/byte of secret data
+                        data_bit_index++;
+                        if (data_bit_index == 8) {
+                            data_bit_index = 0;
+                            data_byte_index++;
+                            if (data_byte_index == secret_payload.size()) {
+                                finished_enc = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if(!finished_enc){
+        std::cerr << "Error: Secret file is too large." << std::endl;
+        jpeg_finish_compress(&compress_info);
+        jpeg_destroy_compress(&compress_info);
+        fclose(output_file);
+        jpeg_finish_decompress(&decompress_info);
+        jpeg_destroy_decompress(&decompress_info);
+        fclose(jpeg_file);
+        return false;
+    }
+    //write modified coefficients to output_file
+    jpeg_write_coefficients(&compress_info, coefficients);
+
+    //cleanup
+    jpeg_finish_compress(&compress_info);
+    jpeg_destroy_compress(&compress_info);
+    fclose(output_file);
+    jpeg_finish_decompress(&decompress_info);
+    jpeg_destroy_decompress(&decompress_info);
+    fclose(jpeg_file);
+
+    return true;
+}
+
