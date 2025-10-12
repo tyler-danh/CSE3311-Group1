@@ -24,7 +24,10 @@ bool Encoder::openFiles(){
         secret_check = secret_file.readPng();
         secret_data = secret_file.getPixelData();
     }
-    else if(secret_file.getExt() == ".jpeg" or secret_file.getExt() == ".jpg"){secret_check = true;}
+    else if(secret_file.getExt() == ".jpeg" or secret_file.getExt() == ".jpg"){
+        secret_check = secret_file.readJpeg();
+        secret_data = secret_file.getPixelData();
+    }
     //only checks png & jpeg files, other files with a valid secret will still pass
     if(carrier_file.getExt() == ".png"){
         carrier_check = carrier_file.readPng();
@@ -167,6 +170,7 @@ bool Encoder::dctJpeg(std::string newFile){
     struct jpeg_compress_struct compress_info;
     compress_info.err = jpeg_std_error(&jpeg_error);
     jpeg_create_compress(&compress_info);
+    newFile = newFile + ".jpeg";
     FILE* output_file = fopen(newFile.c_str(), "wb");
     if (!output_file){
         std::cerr << "Failed to open " << newFile << "for writing JPEG" << std::endl;
@@ -231,6 +235,7 @@ bool Encoder::dctJpeg(std::string newFile){
         jpeg_finish_compress(&compress_info);
         jpeg_destroy_compress(&compress_info);
         fclose(output_file);
+        remove(newFile.c_str());
         jpeg_finish_decompress(&decompress_info);
         jpeg_destroy_decompress(&decompress_info);
         fclose(jpeg_file);

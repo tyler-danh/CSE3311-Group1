@@ -10,10 +10,12 @@ class Decoder{
         Decoder(std::string fileName);
         bool openEncodedFile();
         bool pngDecode(std::string newFile);
+        bool jpegDecode(std::string newFile);
     private:
         std::vector<unsigned char> file_data, extracted_data;
         bool file_check;
         Handler encodedFile;
+        std::string encoded_name;
 };
 
 #endif
