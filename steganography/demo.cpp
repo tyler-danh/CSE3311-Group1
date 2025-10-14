@@ -21,7 +21,13 @@ int main(){
         current_time.erase(std::remove(current_time.begin(), current_time.end(), ' '), current_time.end());
         current_time.erase(std::remove(current_time.begin(), current_time.end(), ':'), current_time.end());
         current_time.erase(std::remove(current_time.begin(), current_time.end(), '\n'), current_time.end());
-        current_time = current_time + ".png";
+        //current_time = current_time + ".png";
+        //commented out above line to prevent issues with .wav carrier
+        //use carrier's extension for output (png or wav etc.)
+    std::string carrier_ext = ".png";
+    size_t pos = carrier.rfind('.');
+    if (pos != std::string::npos) carrier_ext = carrier.substr(pos);
+    current_time = current_time + carrier_ext;
 
         if (stega.pngLsb(current_time)){
             std::cout << "File " << current_time << " created succesfully" << std::endl;

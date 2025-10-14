@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include "decoder.hpp"
+#include <cstdint>
 #include "handler.hpp"
 
 Decoder::Decoder(std::string fileName)
@@ -17,6 +18,10 @@ bool Decoder::openEncodedFile(){
     else if (encodedFile.getExt() == ".png"){
         file_check = encodedFile.readPng();
         file_data = encodedFile.getPixelData();
+    }
+    else if (encodedFile.getExt() == ".wav"){
+        file_check = encodedFile.readWav();
+        file_data = encodedFile.getWavSampleData();
     }
     if (file_check == false){
         std::cerr << "Error: Encoded file failed to open" << std::endl;
@@ -60,7 +65,8 @@ bool Decoder::pngDecode(std::string newFile){
     if (file_ext == ".png" or file_ext == ".jpeg" or file_ext == ".jpg"){
         std::cout << "Console: Image detected. Extracting dimensions." << std::endl;
         unsigned char* height_bytes = reinterpret_cast<unsigned char*>(&height);
-        for (int i = 0; i < sizeof(height); ++i){
+        //changed int to size_t for sizeof compatibility
+            for (size_t i = 0; i < sizeof(height); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = file_data[offset] & 1;
                 extracted_byte |= (bit << j);
@@ -72,7 +78,8 @@ bool Decoder::pngDecode(std::string newFile){
         std::cout << "Console: Extracted height: " << height << std::endl;
 
         unsigned char* width_bytes = reinterpret_cast<unsigned char*>(&width);
-        for (int i = 0; i < sizeof(width); ++i){
+        //changed int to size_t for sizeof compatibility
+        for (size_t i = 0; i < sizeof(width); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = file_data[offset] & 1;
                 extracted_byte |= (bit << j);
@@ -87,8 +94,9 @@ bool Decoder::pngDecode(std::string newFile){
     uint32_t data_size = 0;
     unsigned char* size_bytes = reinterpret_cast<unsigned char*>(&data_size);
     //using data size of data_size for for loop
-    for (int i = 0; i < sizeof(data_size); ++i){
-        for (int j = 0; j < 8; ++j){
+    //changed int to size_t for sizeof compatibility
+    for (size_t i = 0; i < sizeof(data_size); ++i){
+        for (size_t j = 0; j < 8; ++j){
             unsigned char bit = file_data[offset] & 1;
             extracted_byte |= (bit << j);
             offset++;
@@ -106,7 +114,8 @@ bool Decoder::pngDecode(std::string newFile){
 
     //extract file data based on data_size
     extracted_data.reserve(data_size);
-    for (int i = 0; i < data_size; ++i){
+    //changed int to uint32_t for data_size compatibility
+    for (uint32_t i = 0; i < data_size; ++i){
         for (int j = 0; j < 8; ++j){
             unsigned char bit = file_data[offset] & 1;
             extracted_byte |= (bit << j);
@@ -130,6 +139,14 @@ bool Decoder::pngDecode(std::string newFile){
         encodedFile.setImageDimensions(1, width);
         newFile = newFile + file_ext;
         if (!encodedFile.writePng(newFile)){
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
+            return false;
+        }
+    }
+    else if (file_ext == ".wav"){
+        encodedFile.setBinaryFileData(extracted_data);
+        newFile = newFile + file_ext;
+        if(!encodedFile.writeFile(newFile)){
             std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }

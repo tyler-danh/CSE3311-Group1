@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include "encoder.hpp"
+#include <cstdint>
 #include "handler.hpp"
 
 Encoder::Encoder(std::string secret, std::string carrier)
@@ -21,10 +22,14 @@ bool Encoder::openFiles(){
         secret_check = secret_file.readPng();
         secret_data = secret_file.getPixelData();
     }
-    //only checks png files, other files with a valid secret will still pass
+    //only checks png files and wav files; other files with a valid secret will still pass
     if(carrier_file.getExt() == ".png"){
         carrier_check = carrier_file.readPng();
         carrier_data = carrier_file.getPixelData();
+    }
+    else if (carrier_file.getExt() == ".wav"){
+        carrier_check = carrier_file.readWav();
+        carrier_data = carrier_file.getWavSampleData();
     }
     if (secret_check == false or carrier_check == false){
         if (secret_check == false and carrier_check == false){
@@ -79,13 +84,15 @@ bool Encoder::pngLsb(std::string newFile){
             carrier_data[offset] |= bit;
             offset++;
         }
+        
     }
     if (secret_ext == ".png" or secret_ext == ".jpeg" or secret_ext == ".jpg"){
         //encode the image's dimensions
         //height first
         //width next
         unsigned char* secret_height_bytes = reinterpret_cast<unsigned char*>(&secret_height);
-        for (std::streamsize i = 0; i < sizeof(secret_height); ++i){
+        //changed std::streamsize to size_t for sizeof compatibility
+        for (size_t i = 0; i < sizeof(secret_height); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = (secret_height_bytes[i] >> j) & 1;
                 carrier_data[offset] &= 0xFE;
@@ -95,7 +102,8 @@ bool Encoder::pngLsb(std::string newFile){
         }
 
         unsigned char* secret_width_bytes = reinterpret_cast<unsigned char*>(&secret_width);
-        for (std::streamsize i = 0; i < sizeof(secret_width); ++i){
+        //changed std::streamsize to size_t for sizeof compatibility
+        for (size_t i = 0; i < sizeof(secret_width); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = (secret_width_bytes[i] >> j) & 1;
                 carrier_data[offset] &= 0xFE;
@@ -106,7 +114,8 @@ bool Encoder::pngLsb(std::string newFile){
     }
     //encode datasize of file next
     unsigned char* secret_size_bytes = reinterpret_cast<unsigned char*>(&secret_size);
-    for (std::streamsize i = 0; i < sizeof(secret_size); ++i){
+    //changed std::streamsize to size_t for sizeof compatibility
+    for (size_t i = 0; i < sizeof(secret_size); ++i){
         for (int j = 0; j < 8; ++j){
             unsigned char bit = (secret_size_bytes[i] >> j) & 1;
             carrier_data[offset] &= 0xFE;
@@ -123,8 +132,15 @@ bool Encoder::pngLsb(std::string newFile){
             offset++;
         }
     }
-    //now update Handler carrier_file obj with encoded pixel data and write new png
-    carrier_file.setPngPixelData(carrier_data);
-    carrier_file.writePng(newFile);
+    // update handler carrier file obj with encoded data and write new file
+    if (carrier_file.getExt() == ".png"){
+        carrier_file.setPngPixelData(carrier_data);
+        carrier_file.writePng(newFile);
+    }
+    else if (carrier_file.getExt() == ".wav"){
+        // carrier_data currently contains the raw file bytes read by readFile(); need to replace the wav samples
+        carrier_file.setWavSampleData(carrier_data);
+        carrier_file.writeWav(newFile);
+    }
     return true;
 }

@@ -11,11 +11,16 @@ Handler::Handler(std::string file_name){
 }
 void Handler::parseExt(){
     //check file extentions of the file
-    if(file_name.contains(".txt")){file_ext=".txt";}
-    else if(file_name.contains(".png")){file_ext=".png";}
-    else if(file_name.contains(".jpeg")){file_ext=".jpeg";}
-    else if(file_name.contains(".jpg")){file_ext=".jpg";}
-    else{file_ext = "INVALID";}
+    //could not compile with .contains() so used .find() instead
+    //also made it case insensitive
+    std::string lower = file_name;
+    for (char &c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (lower.find(".txt") != std::string::npos) { file_ext = ".txt"; }
+    else if (lower.find(".wav") != std::string::npos) { file_ext = ".wav"; }
+    else if (lower.find(".png") != std::string::npos) { file_ext = ".png"; }
+    else if (lower.find(".jpeg") != std::string::npos) { file_ext = ".jpeg"; }
+    else if (lower.find(".jpg") != std::string::npos) { file_ext = ".jpg"; }
+    else { file_ext = "INVALID"; }
 }
 //----------READING-----------
 bool Handler::readFile(){
@@ -90,7 +95,7 @@ bool Handler::readPng(){
 
     png_read_update_info(png, png_info);
 
-    //now read image data into png_pixel_data and close file
+    // read image data into png_pixel_data and close file
     int row_bytes = png_get_rowbytes(png, png_info);
     png_pixel_data.resize(row_bytes * image_height);
 
@@ -104,6 +109,55 @@ bool Handler::readPng(){
     fclose(image_file);
     return true;
 }
+
+// read whole file into binary_file_data and locate data chunk
+bool Handler::readWav(){
+    if (file_ext != ".wav"){
+        std::cerr << "File " << file_name << " is not wav" << std::endl;
+        return false;
+    }
+    std::ifstream file(file_name, std::ios::binary | std::ios::ate);
+    if(!file.is_open()){
+        std::cerr << "Error: Could not open " << file_name << std::endl;
+        return false;
+    }
+    file_size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    binary_file_data.resize(file_size);
+    if(!file.read(reinterpret_cast<char*>(binary_file_data.data()), file_size)){
+        std::cerr << "Error: Could not read " << file_name << std::endl;
+        return false;
+    }
+    file.close();
+
+    // find data chunk in WAV file
+    wav_data_offset = 0;
+    wav_data_size = 0;
+    for (std::streamsize i = 0; i + 8 <= file_size; ++i){
+        if (binary_file_data[i] == 'd' && binary_file_data[i+1] == 'a' && binary_file_data[i+2] == 't' && binary_file_data[i+3] == 'a'){
+            std::uint32_t size = 0;
+            size |= static_cast<std::uint32_t>(binary_file_data[i+4]);
+            size |= static_cast<std::uint32_t>(binary_file_data[i+5]) << 8;
+            size |= static_cast<std::uint32_t>(binary_file_data[i+6]) << 16;
+            size |= static_cast<std::uint32_t>(binary_file_data[i+7]) << 24;
+            wav_data_size = size;
+            wav_data_offset = i + 8; // data starts after data + size field
+            // some WAV files have a data chunk size of 0
+            // in that case, use the remaining bytes in the file as the data chunk size
+            if (wav_data_size == 0) {
+                std::streamsize remaining = file_size - wav_data_offset;
+                if (remaining > 0) wav_data_size = static_cast<std::uint32_t>(remaining);
+            }
+            break;
+        }
+    }
+    if (wav_data_offset == 0){
+        std::cerr << "Error: Could not find data chunk in wav file" << std::endl;
+        return false;
+    }
+    return true;
+}
+
 //----------WRITING----------
 bool Handler::writeFile(const std::string name){
     std::ofstream file(name, std::ios::binary);
@@ -121,9 +175,30 @@ bool Handler::writeFile(const std::string name){
     file.close();
     return true;
 }
+//write wav replace data chunk bytes with sample_data in binary_file_data and write whole file
+bool Handler::writeWav(const std::string name){
+    if (file_ext != ".wav" && name.find(".wav") == std::string::npos){
+        std::cerr << "Error: Cannot write " << name << " to wav file" << std::endl;
+        return false;
+    }
+    if (wav_data_offset == 0 || wav_data_size == 0){
+        std::cerr << "Error: WAV data chunk not initialized" << std::endl;
+        return false;
+    }
+    // write binary_file_data to file
+    std::ofstream file(name, std::ios::binary);
+    if (!file.is_open()){
+        std::cerr << "Error: Could not open " << name << " for writing" << std::endl;
+        return false;
+    }
+    file.write(reinterpret_cast<const char*>(binary_file_data.data()), binary_file_data.size());
+    file.close();
+    return true;
+}
 bool Handler::writePng(const std::string name){
     //this function assumes image is in simple RGBA format
-    if (!name.contains(".png")){
+    //find again because of earlier issue with .contains()
+    if (name.find(".png") == std::string::npos){
         std::cerr << "Error: Cannot write " << name << " to png file" << std::endl;
         return false;
     }
@@ -187,6 +262,13 @@ bool Handler::writePng(const std::string name){
 void Handler::setPngPixelData(std::vector<unsigned char> pixel_data){
     png_pixel_data = pixel_data;
 }
+
+void Handler::setWavSampleData(std::vector<unsigned char> sample_data){
+    if (wav_data_offset == 0 || wav_data_size == 0) return;
+    for (std::uint32_t i = 0; i < wav_data_size && i < sample_data.size(); ++i){
+        binary_file_data[wav_data_offset + i] = sample_data[i];
+    }
+}
 void Handler::setBinaryFileData(std::vector<unsigned char> file_data){
     binary_file_data = file_data;
 }
@@ -201,6 +283,10 @@ std::string Handler::getExt() const{
 }
 std::vector<unsigned char> Handler::getPixelData() const{
     return png_pixel_data;
+}
+std::vector<unsigned char> Handler::getWavSampleData() const{
+    if (wav_data_offset == 0 || wav_data_size == 0) return std::vector<unsigned char>();
+    return std::vector<unsigned char>(binary_file_data.begin() + wav_data_offset, binary_file_data.begin() + wav_data_offset + wav_data_size);
 }
 std::vector<unsigned char> Handler::getFileData() const{
     return binary_file_data;
