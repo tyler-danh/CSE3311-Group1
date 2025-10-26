@@ -17,6 +17,7 @@ class Encoder{
         bool secret_check, carrier_check = false;
         std::string secret_name, carrier_name;
         Handler secret_file, carrier_file;
+        uint16_t generateChecksum();
 };
 
 #endif

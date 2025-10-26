@@ -230,10 +230,10 @@ bool Handler::writePng(const std::string name){
     return true;
 }
 bool Handler::writeJpeg(const std::string name){
-    if(file_ext != ".jpeg" and file_ext != ".jpg"){
-        std::cerr << "Error: File " << file_name << " is not a jpeg/jpg" << std::endl;
-        return false;
-    }
+    // if(file_ext != ".jpeg" and file_ext != ".jpg"){
+    //     std::cerr << "Error: File " << file_name << " is not a jpeg/jpg" << std::endl;
+    //     return false;
+    // }
     //init jpeg structs for compression
     struct jpeg_compress_struct compress_info;
     struct jpeg_error_mgr jpeg_err;

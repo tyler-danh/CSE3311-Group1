@@ -29,13 +29,39 @@ bool Decoder::openEncodedFile(){
     }
     return true;
 }
+bool Decoder::checksumCheck(uint16_t checksum){
+    if (checksum % 13 == 0){return true;}
+    return false;
+}
 bool Decoder::pngDecode(std::string newFile){
     std::streamsize offset = 0;
     uint8_t ext_len = 0;
+    uint16_t checksum = 0;
     unsigned char extracted_byte = 0;
     int height, width = 0;
 
-    //first get ext_len
+    //get checksum and check it
+    unsigned char* checksum_bytes = reinterpret_cast<unsigned char*>(&checksum);
+    for(int i = 0; i < sizeof(checksum); ++i){
+        for (int j = 0; j < 8; ++j){
+            unsigned char bit = file_data[offset] & 1;
+            extracted_byte |= (bit << j);
+            offset++;
+        }
+        checksum_bytes[i] = extracted_byte;
+        extracted_byte = 0;
+    }
+    std::cout << checksum;
+    checksum = extracted_byte;
+    if(!checksumCheck(checksum)){
+        std::cerr << "Error: Checksum has been tampered with or invalid." << "\n The file does not contained encoded data, has not been encoded with StegaSaur, or encoded data has been tampered with." << std::endl;
+        return false;
+    }
+    else{
+        std::cout << "Console: Checksum verified. Continuing extraction." << std::endl;
+    }
+    extracted_byte = 0;
+    //next, get ext_len
     for (int i = 0; i < 8; ++i){
         unsigned char bit = file_data[offset] & 1;
         extracted_byte |= (bit << i);
@@ -143,6 +169,16 @@ bool Decoder::pngDecode(std::string newFile){
             return false;
         }
     }
+    else if (file_ext == ".jpeg" or file_ext == ".jpg"){
+        encodedFile.setPngPixelData(extracted_data);
+        encodedFile.setImageDimensions(0, height);
+        encodedFile.setImageDimensions(1, width);
+        newFile = newFile + file_ext;
+        if (!encodedFile.writeJpeg(newFile)){
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
+            return false;
+        }
+    }
 
     return true;
 }
@@ -174,14 +210,15 @@ bool Decoder::jpegDecode(std::string newFile){
     int bit_counter = 0;
 
     //things we need to extract
+    uint16_t checksum = 0;
     uint8_t ext_len = 0;
     uint32_t file_size = 0;
     size_t total_size = 0;
     int height,width = 0;
     bool parsed = false; //once we have enough data mark as true to stop iterating
 
-    //JSTEG extraction logic
-    for (int comp_i = 0; comp_i < decompress_info.num_components; ++comp_i) {
+//JSTEG extraction logic
+    for (int comp_i = 0; comp_i < decompress_info.num_components; ++comp_i){
         for (int block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks; ++block_y) {
             JBLOCKARRAY block_array = (decompress_info.mem->access_virt_barray)((j_common_ptr)&decompress_info, coeffcients[comp_i], block_y, 1, FALSE);
             for (int block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks; ++block_x) {
@@ -195,23 +232,50 @@ bool Decoder::jpegDecode(std::string newFile){
                         current_byte |= (bit << bit_counter);
                         bit_counter++;
                         
-                        if (bit_counter == 8) {
+                        if (bit_counter == 8){
                             extracted_data.push_back(current_byte);
                             current_byte = 0;
                             bit_counter = 0;
+                            if (!parsed) {
+                                //define sizes, these are minimum sizes that will be extracted
+                                //extracting currently has no verification, will be done later
+                                const size_t CHECKSUM_SIZE = sizeof(uint16_t); // 2
+                                const size_t EXT_LEN_SIZE = sizeof(uint8_t);  // 1
+                                const size_t FILE_SIZE_SIZE = sizeof(uint32_t); // 4
+                                const size_t IMG_DIMS_SIZE = sizeof(int) * 2; // 8
 
-                            //once we have enough bytes, parse the metadata to find the total size
-                            if (!parsed && extracted_data.size() >= 5) { //1 for ext_len + 4 for file_size
-                                ext_len = extracted_data[0];
-                                if (extracted_data.size() >= 1 + ext_len + sizeof(uint32_t)) {
-                                    memcpy(&file_size, &extracted_data[1 + ext_len], sizeof(uint32_t));
-                                    total_size = 1 + ext_len + sizeof(uint32_t) + file_size;
-                                    parsed = true;
+                                //check if we have the minimal header (checksum + ext_len)
+                                if (extracted_data.size() >= CHECKSUM_SIZE + EXT_LEN_SIZE){
+                                    ext_len = extracted_data[CHECKSUM_SIZE];
+                                    size_t base_header_size = CHECKSUM_SIZE + EXT_LEN_SIZE + ext_len;
+
+                                    //check if we have the base header (checksum + ext_len + ext)
+                                    if (extracted_data.size() >= base_header_size){
+                                        //we must read the extension now to check it
+                                        std::string temp_ext(extracted_data.begin() + CHECKSUM_SIZE + EXT_LEN_SIZE,
+                                                             extracted_data.begin() + base_header_size);
+                                        
+                                        size_t total_header_size = base_header_size;
+                                        if (temp_ext == ".png" || temp_ext == ".jpeg" || temp_ext == ".jpg"){
+                                            total_header_size += IMG_DIMS_SIZE;
+                                        }
+
+                                        //check if we have the full header (all metadata)
+                                        if (extracted_data.size() >= total_header_size + FILE_SIZE_SIZE){
+                                            //read the file size
+                                            memcpy(&file_size, &extracted_data[total_header_size], FILE_SIZE_SIZE);
+                                            
+                                            //calculate total size and set the flag
+                                            total_size = total_header_size + FILE_SIZE_SIZE + file_size;
+                                            parsed = true;
+                                        }
+                                    }
                                 }
                             }
                         }
+
                         //if we have extracted the entire package, stop
-                        if (parsed && extracted_data.size() == total_size) {
+                        if (parsed && extracted_data.size() == total_size){
                             goto end_extraction;
                         }
                     }
@@ -234,40 +298,37 @@ bool Decoder::jpegDecode(std::string newFile){
     //parse extracted data to write file
     size_t offset = 0;
     current_byte = 0;
+    //get checksum
+    memcpy(&checksum, &extracted_data[offset], sizeof(uint16_t));
+    //check checksum
+    if(!checksumCheck(checksum)){
+        std::cerr << "Error: Checksum has been tampered with or invalid." << "\n The file does not contained encoded data, has not been encoded with StegaSaur, or encoded data has been tampered with." << std::endl;
+        return false;
+    }
+    else{
+        std::cout << "Console: Checksum verified. Continuing extraction." << std::endl;
+    }
+    offset += sizeof(checksum);
     //get file extension
-    ext_len = extracted_data[offset++];
-    std::string file_ext(extracted_data.begin() + offset, extracted_data.begin() + offset + ext_len);
+    ext_len = extracted_data[offset];
+    offset += sizeof(ext_len);
+    std::string file_ext = "";
+    file_ext.assign(extracted_data.begin() + offset, extracted_data.begin() + offset + ext_len);
     offset += ext_len;
     if (file_ext == ".png" or file_ext == ".jpeg" or file_ext == ".jpg"){
         std::cout << "Console: Image detected. Extracting dimensions." << std::endl;
-        unsigned char* height_bytes = reinterpret_cast<unsigned char*>(&height);
-        for (int i = 0; i < sizeof(height); ++i){
-            for (int j = 0; j < 8; ++j){
-                unsigned char bit = file_data[offset] & 1;
-                current_byte |= (bit << j);
-                offset++;
-            }
-            height_bytes[i] = current_byte;
-            current_byte = 0;
-        }
+        memcpy(&height, &extracted_data[offset], sizeof(int));
+        offset += sizeof(height);
         std::cout << "Console: Extracted height: " << height << std::endl;
-
-        unsigned char* width_bytes = reinterpret_cast<unsigned char*>(&width);
-        for (int i = 0; i < sizeof(width); ++i){
-            for (int j = 0; j < 8; ++j){
-                unsigned char bit = file_data[offset] & 1;
-                current_byte |= (bit << j);
-                offset++;
-            }
-            width_bytes[i] = current_byte;
-            current_byte = 0;
-        }
+        memcpy(&width, &extracted_data[offset], sizeof(int));
+        offset += sizeof(width);
         std::cout << "Console: Extracted width: " << width << std::endl;
     }
     //get file size
-    offset += sizeof(uint32_t);
+    memcpy(&file_size, &extracted_data[offset], sizeof(uint32_t));
+    offset += sizeof(file_size);
     //get file data
-    file_data.insert(file_data.begin(),extracted_data.begin() + offset, extracted_data.end());
+    file_data.insert(file_data.begin(), extracted_data.begin() + offset, extracted_data.end());
 
     //write file
     if (file_ext == ".txt"){
@@ -276,6 +337,8 @@ bool Decoder::jpegDecode(std::string newFile){
         if(!encodedFile.writeFile(newFile)){
             return false;
         }
+        std::cout << "Console: Successfully extracted to " << newFile << std::endl;
+        return true;
     }
     else if (file_ext == ".png"){
         encodedFile.setPngPixelData(file_data);
@@ -286,6 +349,8 @@ bool Decoder::jpegDecode(std::string newFile){
             std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }
+        std::cout << "Console: Successfully extracted to " << newFile << std::endl;
+        return true;
     }
-    return true;
+    return false;
 }

@@ -3,6 +3,8 @@
 #include "encoder.hpp"
 #include "handler.hpp"
 #include <jpeglib.h>
+#include <random>
+#include <chrono>
 
 Encoder::Encoder(std::string secret, std::string carrier)
 //constructor has an init list that create Handler object to handle input files
@@ -52,6 +54,26 @@ bool Encoder::openFiles(){
     return true;
 }
 
+uint16_t Encoder::generateChecksum(){
+    uint16_t checksum = 0;
+    //initialize random number generator and seed with device's time since epoch
+    //default_random_engine to choose different engines based on platform
+    std::default_random_engine random_numbers(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    std::uniform_int_distribution<unsigned int> dist(1, INT16_MAX);
+    //now set checksum to random number
+    while(1){
+        checksum = dist(random_numbers);
+        //multiply by a constant for use in checking during decoding to ensure this is our checksum
+        //data is very fragile anyways, we decided to keep it very simple
+        checksum = checksum * 13;
+        if (checksum % 13 == 0){
+            break;
+        }
+    }
+    std::cout << "Console: Checksum generated: " << checksum << std::endl;
+    return checksum;
+}
+
 bool Encoder::pngLsb(std::string newFile){
     std::string secret_ext = secret_file.getExt();
     int secret_height, secret_width = 0;
@@ -69,7 +91,20 @@ bool Encoder::pngLsb(std::string newFile){
     }
 
     std::streamsize offset = 0;
-    //encode size of file ext first
+    //encode the checksum first
+    uint16_t checksum = generateChecksum();
+    //then encode the bytes of the checksum
+    unsigned char* checksum_bytes = reinterpret_cast<unsigned char*>(&checksum);
+    for (std::streamsize i = 0; i < sizeof(checksum); ++i){
+        for (int j = 0; j < 8; ++j){
+            unsigned char bit = (checksum_bytes[i] >> j) & 1;
+            carrier_data[offset] &= 0xFE;
+            carrier_data[offset] |= bit;
+            offset++;
+        }
+    }
+
+    //encode size of file ext
     //i use 'j' for for loops nested in another for loop - td
     uint8_t secret_ext_len = static_cast<uint8_t>(secret_ext.length());
     for (int i = 0; i < 8; ++i){
@@ -132,9 +167,12 @@ bool Encoder::pngLsb(std::string newFile){
         }
     }
     //now update Handler carrier_file obj with encoded pixel data and write new png
+    newFile = newFile + ".png";
     carrier_file.setPngPixelData(carrier_data);
-    carrier_file.writePng(newFile);
-    return true;
+    if(carrier_file.writePng(newFile)){
+        return true;
+    }
+    return false;
 }
 
 bool Encoder::dctJpeg(std::string newFile){
@@ -179,16 +217,31 @@ bool Encoder::dctJpeg(std::string newFile){
     jpeg_stdio_dest(&compress_info, output_file);
     jpeg_copy_critical_parameters(&decompress_info, &compress_info);
 
-    //build the payload: ext + size + file_data
-    //if its an image: ext + height + width + size + file_data
+    //build the payload: checksum + ext + size + file_data
+    //if its an image: checksum + ext + height + width + size + file_data
     std::vector<unsigned char> secret_payload;
     std::string secret_ext = secret_file.getExt();
     std::uint8_t ext_len = static_cast<uint8_t>(secret_ext.length());
+    unsigned char* ext_len_bytes = reinterpret_cast<unsigned char*>(&ext_len);
     uint32_t secret_size = secret_data.size();
     unsigned char* size_bytes = reinterpret_cast<unsigned char*>(&secret_size);
+    uint16_t checksum = generateChecksum();
+    unsigned char* checksum_bytes = reinterpret_cast<unsigned char*>(&checksum);
 
-    secret_payload.push_back(ext_len);
+    secret_payload.insert(secret_payload.end(), checksum_bytes, checksum_bytes + sizeof(checksum));
+    secret_payload.insert(secret_payload.end(), ext_len_bytes, ext_len_bytes + sizeof(ext_len));
     secret_payload.insert(secret_payload.end(), secret_ext.begin(), secret_ext.end());
+    //while its unlikely an image will fit in a jpeg, (even if its a png/jpeg) it will still be implemented
+    if (secret_ext == ".png" or secret_ext == ".jpeg" or secret_ext == ".jpg"){
+        int secret_height = secret_file.getImageDimensions(0);
+        int secret_width = secret_file.getImageDimensions(1);
+        std::cout << "Secret Height: " << secret_height << std::endl << "Secret Width " << secret_width << std::endl;
+        unsigned char* secret_height_bytes = reinterpret_cast<unsigned char*>(&secret_height);
+        unsigned char* secret_width_bytes = reinterpret_cast<unsigned char*>(&secret_width);
+
+        secret_payload.insert(secret_payload.end(), secret_height_bytes, secret_height_bytes + sizeof(secret_height));
+        secret_payload.insert(secret_payload.end(), secret_width_bytes, secret_width_bytes + sizeof(secret_width));
+    } 
     secret_payload.insert(secret_payload.end(), size_bytes, size_bytes + sizeof(secret_size));
     secret_payload.insert(secret_payload.end(), secret_data.begin(), secret_data.end());
 
