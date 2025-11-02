@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <jpeglib.h>
 
 class Handler{
     public:
@@ -12,7 +13,9 @@ class Handler{
         bool readFile(); //DO NOT USE THIS FOR IMAGES
         bool writeFile(const std::string name);
         bool readPng();
+        bool readJpeg();
         bool writePng(const std::string name);
+        bool writeJpeg(const std::string name);
 
         //setters
         void setPngPixelData(std::vector<unsigned char> pixel_data);
@@ -29,7 +32,7 @@ class Handler{
     private:
         std::string file_name, file_ext;
         std::vector<unsigned char> binary_file_data; //NOT TO BE USED FOR IMAGES!!!
-        std::vector<unsigned char> png_pixel_data;
+        std::vector<unsigned char> image_pixel_data;
         std::streamsize file_size;
         int image_width, image_height = 0;
 };
