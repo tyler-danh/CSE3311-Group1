@@ -2,6 +2,7 @@
 #include <string>
 #include <cstdio>
 #include <png.h>
+#include <jpeglib.h>
 #include <zlib.h>
 #include "handler.hpp"
 
@@ -95,17 +96,62 @@ bool Handler::readPng(){
 
     png_read_update_info(png, png_info);
 
-    // read image data into png_pixel_data and close file
+    // read image data into image_pixel_data and close file
     int row_bytes = png_get_rowbytes(png, png_info);
-    png_pixel_data.resize(row_bytes * image_height);
+    image_pixel_data.resize(row_bytes * image_height);
 
     std::vector<png_bytep> row_pointers(image_height);
     for (int i = 0; i < image_height; i++){
-        row_pointers[i] = &png_pixel_data[i * row_bytes];
+        row_pointers[i] = &image_pixel_data[i * row_bytes];
     }
-    file_size = png_pixel_data.size();
+    file_size = image_pixel_data.size();
     png_read_image(png, row_pointers.data());
     png_destroy_read_struct(&png, &png_info, NULL);
+    fclose(image_file);
+    return true;
+}
+bool Handler::readJpeg(){
+    if(file_ext != ".jpeg" and file_ext != ".jpg"){
+        std::cerr << "Error: File " << file_name << " is not a jpeg/jpg" << std::endl;
+        return false;
+    }
+    //initialize jpeg decompression obj and error handling
+    //these are from libjpeg.h
+    struct jpeg_decompress_struct decompress_info;
+    struct jpeg_error_mgr jpeg_err;
+
+    decompress_info.err = jpeg_std_error(&jpeg_err);
+    jpeg_create_decompress(&decompress_info);
+
+    //open jpeg file
+    FILE* image_file = fopen(file_name.c_str(), "rb");
+    if(!image_file){
+        std::cerr << "Error: Could not open " << file_name << std::endl;
+        jpeg_destroy_decompress(&decompress_info);
+        return false;
+    }
+    jpeg_stdio_src(&decompress_info, image_file);
+
+    //read jpeg header to get image info
+    (void) jpeg_read_header(&decompress_info, TRUE);
+    //decompress image
+    (void) jpeg_start_decompress(&decompress_info);
+
+    image_height = decompress_info.output_height;
+    image_width = decompress_info.output_height;
+    int c_channels = decompress_info.output_components; //3 for rgb
+
+    image_pixel_data.resize(image_height * image_width * c_channels);
+
+    //read image row by row (scanline by scanline)
+    while(decompress_info.output_scanline < decompress_info.image_height){
+        unsigned char* row_ptr = &image_pixel_data[decompress_info.output_scanline * image_width * c_channels];
+        jpeg_read_scanlines(&decompress_info, &row_ptr, 1);
+    }
+
+    //clean up structs
+    (void) jpeg_finish_decompress(&decompress_info);
+    jpeg_destroy_decompress(&decompress_info);
     fclose(image_file);
     return true;
 }
@@ -157,7 +203,6 @@ bool Handler::readWav(){
     }
     return true;
 }
-
 //----------WRITING----------
 bool Handler::writeFile(const std::string name){
     std::ofstream file(name, std::ios::binary);
@@ -230,10 +275,10 @@ bool Handler::writePng(const std::string name){
         return false;
     }
     //ensure image data aligns with image dimensions during read
-    if (png_pixel_data.size() != (size_t)image_width * image_height * 4) {
+    if (image_pixel_data.size() != (size_t)image_width * image_height * 4) {
         std::cerr << "CRITICAL ERROR: Data size does not match dimensions!" << std::endl;
         std::cerr << "Expected size: " << (size_t)image_width * image_height * 4 << std::endl;
-        std::cerr << "Actual size:   " << png_pixel_data.size() << std::endl;
+        std::cerr << "Actual size:   " << image_pixel_data.size() << std::endl;
         png_destroy_write_struct(&png, &png_info);
         fclose(image_file);
         return false;
@@ -249,7 +294,7 @@ bool Handler::writePng(const std::string name){
     int row_bytes = image_width * 4;
     std::vector<png_bytep> row_pointers(image_height);
     for(int i = 0; i < image_height; ++i){
-        row_pointers[i] = const_cast<png_bytep>(&png_pixel_data[i * row_bytes]);
+        row_pointers[i] = const_cast<png_bytep>(&image_pixel_data[i * row_bytes]);
     }
     png_write_image(png, row_pointers.data());
     png_write_end(png, NULL);
@@ -258,9 +303,57 @@ bool Handler::writePng(const std::string name){
     fclose(image_file);
     return true;
 }
+bool Handler::writeJpeg(const std::string name){
+    // if(file_ext != ".jpeg" and file_ext != ".jpg"){
+    //     std::cerr << "Error: File " << file_name << " is not a jpeg/jpg" << std::endl;
+    //     return false;
+    // }
+    //init jpeg structs for compression
+    struct jpeg_compress_struct compress_info;
+    struct jpeg_error_mgr jpeg_err;
+
+    compress_info.err = jpeg_std_error(&jpeg_err);
+    jpeg_create_compress(&compress_info);
+
+    //create output file
+    FILE* image_file = fopen(name.c_str(), "wb");
+    if(!image_file){
+        std::cerr << "Error: Cannot write " << name << " to jpeg file." << std::endl;
+        jpeg_destroy_compress(&compress_info);
+        return false;
+    }
+    jpeg_stdio_dest(&compress_info, image_file);
+
+    //set image properties
+    compress_info.image_height = image_height;
+    compress_info.image_width = image_width;
+    compress_info.input_components = 3; //RGB
+    compress_info.in_color_space = JCS_RGB;
+
+    //set defaults and quality
+    jpeg_set_defaults(&compress_info);
+    jpeg_set_quality(&compress_info, 95, TRUE); //adjust quality here, KEEP CONSTANT, NOT ALLOW USER INPUT
+
+    //compress image
+    jpeg_start_compress(&compress_info, TRUE);
+    //write pixel data row by row (scanline by scanline)
+    while (compress_info.next_scanline < compress_info.image_height){
+        const unsigned char* row_ptr = &image_pixel_data[compress_info.next_scanline * image_width * 3];
+        jpeg_write_scanlines(&compress_info, const_cast<JSAMPROW*>(&row_ptr), 1);
+    }
+
+    //cleanup structs
+    jpeg_finish_compress(&compress_info);
+    jpeg_destroy_compress(&compress_info);
+    fclose(image_file);
+
+    return true;
+}
+
 //----------SETTERS----------//
+
 void Handler::setPngPixelData(std::vector<unsigned char> pixel_data){
-    png_pixel_data = pixel_data;
+    image_pixel_data = pixel_data;
 }
 
 void Handler::setWavSampleData(std::vector<unsigned char> sample_data){
@@ -276,13 +369,14 @@ void Handler::setImageDimensions(int selector, int dimension){
     if (selector == 0){image_height = dimension;}
     else{image_width = dimension;}
 }
+
 //----------GETTERS----------//
 
 std::string Handler::getExt() const{
     return file_ext;
 }
 std::vector<unsigned char> Handler::getPixelData() const{
-    return png_pixel_data;
+    return image_pixel_data;
 }
 std::vector<unsigned char> Handler::getWavSampleData() const{
     if (wav_data_offset == 0 || wav_data_size == 0) return std::vector<unsigned char>();
