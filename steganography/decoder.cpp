@@ -43,11 +43,11 @@ bool Decoder::pngDecode(std::string newFile){
     uint8_t ext_len = 0;
     uint16_t checksum = 0;
     unsigned char extracted_byte = 0;
-    int height, width = 0;
+    int height = 0, width = 0;
 
     //get checksum and check it
     unsigned char* checksum_bytes = reinterpret_cast<unsigned char*>(&checksum);
-    for(int i = 0; i < sizeof(checksum); ++i){
+    for (size_t i = 0; i < sizeof(checksum); ++i){
         for (int j = 0; j < 8; ++j){
             unsigned char bit = file_data[offset] & 1;
             extracted_byte |= (bit << j);
@@ -231,14 +231,14 @@ bool Decoder::jpegDecode(std::string newFile){
     uint8_t ext_len = 0;
     uint32_t file_size = 0;
     size_t total_size = 0;
-    int height,width = 0;
+    int height = 0, width = 0;
     bool parsed = false; //once we have enough data mark as true to stop iterating
 
 //JSTEG extraction logic
     for (int comp_i = 0; comp_i < decompress_info.num_components; ++comp_i){
-        for (int block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks; ++block_y) {
+        for (JDIMENSION block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks; ++block_y) {
             JBLOCKARRAY block_array = (decompress_info.mem->access_virt_barray)((j_common_ptr)&decompress_info, coeffcients[comp_i], block_y, 1, FALSE);
-            for (int block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks; ++block_x) {
+            for (JDIMENSION block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks; ++block_x) {
                 for (int i = 0; i < DCTSIZE2; ++i) {
                     JCOEF coef_val = block_array[0][block_x][i];
 

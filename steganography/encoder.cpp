@@ -81,7 +81,7 @@ uint16_t Encoder::generateChecksum(){
 
 bool Encoder::pngLsb(std::string newFile){
     std::string secret_ext = secret_file.getExt();
-    int secret_height, secret_width = 0;
+    int secret_height = 0, secret_width = 0;
     if (secret_ext == ".png" or secret_ext == ".jpeg" or secret_ext == ".jpg"){
         secret_height = secret_file.getImageDimensions(0);
         secret_width = secret_file.getImageDimensions(1);
@@ -100,7 +100,7 @@ bool Encoder::pngLsb(std::string newFile){
     uint16_t checksum = generateChecksum();
     //then encode the bytes of the checksum
     unsigned char* checksum_bytes = reinterpret_cast<unsigned char*>(&checksum);
-    for (std::streamsize i = 0; i < sizeof(checksum); ++i){
+    for (size_t i = 0; i < sizeof(checksum); ++i){
         for (int j = 0; j < 8; ++j){
             unsigned char bit = (checksum_bytes[i] >> j) & 1;
             carrier_data[offset] &= 0xFE;
@@ -265,9 +265,9 @@ bool Encoder::dctJpeg(std::string newFile){
 
     //iterate through jpeg components (Y, Cb, Cr), blocks and coefficients
     for (int comp_i = 0; comp_i < decompress_info.num_components && !finished_enc; ++comp_i) {
-        for (int block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks && !finished_enc; ++block_y) {
+        for (JDIMENSION block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks && !finished_enc; ++block_y) {
             JBLOCKARRAY block_array = (decompress_info.mem->access_virt_barray)((j_common_ptr)&decompress_info, coefficients[comp_i], block_y, 1, FALSE);
-            for (int block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks && !finished_enc; ++block_x) {
+            for (JDIMENSION block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks && !finished_enc; ++block_x) {
                 //each block has 64 coefficients
                 for (int i = 0; i < DCTSIZE2; ++i) {
                     JCOEF* coef_ptr = &block_array[0][block_x][i];
