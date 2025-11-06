@@ -24,7 +24,7 @@ bool Decoder::openEncodedFile(){
         file_check = encodedFile.readWav();
         file_data = encodedFile.getWavSampleData();
     }
-    else if (encodedFile.getExt() == ".jpeg"){
+    else if (encodedFile.getExt() == ".jpeg" or encodedFile.getExt() == ".jpg"){
         //must do actual checking in decoding method
         file_check = true;
     }
