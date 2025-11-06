@@ -40,7 +40,11 @@ bool Encoder::openFiles(){
         carrier_check = carrier_file.readWav();
         carrier_data = carrier_file.getWavSampleData();
     }
-    else if(carrier_file.getExt() == ".jpeg" or carrier_file.getExt() == ".jpg"){carrier_check = true;}
+    else if(carrier_file.getExt() == ".jpeg" or carrier_file.getExt() == ".jpg"){
+        // read JPEG pixel data so encoding methods that expect pixel bytes have data
+        carrier_check = carrier_file.readJpeg();
+        carrier_data = carrier_file.getPixelData();
+    }
     if (secret_check == false or carrier_check == false){
         if (secret_check == false and carrier_check == false){
             std::cerr << "Error: Failed to open secret file and carrier file" << std::endl;
@@ -88,9 +92,10 @@ bool Encoder::pngLsb(std::string newFile){
         std::cout << "Secret Height: " << secret_height << std::endl << "Secret Width " << secret_width << std::endl;
     } 
     std::streamsize secret_size = secret_file.getFileSize();
-    //ext len + ext chars + datasize of the file size + actual file size * 8
-    std::streamsize required_bytes = (1 + secret_ext.length() + secret_size + secret_file.getFileSize()) * 8;
-    if(required_bytes > carrier_file.getFileSize()){
+    //ext len + ext chars + datasize of the file size + actual file size (in bytes) -> times 8 bits
+    std::streamsize required_bytes = (1 + static_cast<std::streamsize>(secret_ext.length()) + static_cast<std::streamsize>(secret_size)) * 8;
+    // ensure carrier_data buffer has enough bytes to hold required bits
+    if (required_bytes > static_cast<std::streamsize>(carrier_data.size())){
         std::cout << "Error: Secret file is too large." << std::endl;
         return false;
     }
@@ -221,7 +226,14 @@ bool Encoder::dctJpeg(std::string newFile){
     struct jpeg_compress_struct compress_info;
     compress_info.err = jpeg_std_error(&jpeg_error);
     jpeg_create_compress(&compress_info);
-    newFile = newFile + ".jpeg";
+    // if newFile already ends with .jpeg or .jpg, don't append
+    if (!(newFile.size() >= 5 && (newFile.rfind(".jpeg") == newFile.size() - 5)) &&
+        !(newFile.size() >= 4 && (newFile.rfind(".jpg") == newFile.size() - 4))) {
+        // choose extension to append based on carrier's extension to preserve original style
+        std::string jpeg_ext = ".jpeg";
+        if (carrier_file.getExt() == ".jpg") jpeg_ext = ".jpg";
+        newFile = newFile + jpeg_ext;
+    }
     FILE* output_file = fopen(newFile.c_str(), "wb");
     if (!output_file){
         std::cerr << "Failed to open " << newFile << "for writing JPEG" << std::endl;

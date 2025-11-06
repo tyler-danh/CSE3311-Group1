@@ -138,7 +138,7 @@ bool Handler::readJpeg(){
     (void) jpeg_start_decompress(&decompress_info);
 
     image_height = decompress_info.output_height;
-    image_width = decompress_info.output_height;
+    image_width = decompress_info.output_width;
     int c_channels = decompress_info.output_components; //3 for rgb
 
     image_pixel_data.resize(image_height * image_width * c_channels);
