@@ -66,6 +66,8 @@ uint16_t Encoder::generateChecksum(){
         //multiply by a constant for use in checking during decoding to ensure this is our checksum
         //data is very fragile anyways, we decided to keep it very simple
         checksum = checksum * 13;
+        //ensure generated numbers are actually multiplied by 13
+        //for some reason generator didnt do this during testing??
         if (checksum % 13 == 0){
             break;
         }
