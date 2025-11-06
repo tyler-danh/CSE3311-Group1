@@ -29,15 +29,39 @@ int main(){
     if (pos != std::string::npos) carrier_ext = carrier.substr(pos);
     current_time = current_time + carrier_ext;
 
-        if (stega.pngLsb(current_time)){
-            std::cout << "File " << current_time << " created succesfully" << std::endl;
+        // choose encoder based on carrier extension
+        if (carrier_ext == ".png"){
+            if (stega.pngLsb(current_time)){
+                std::cout << "File " << current_time << " created succesfully" << std::endl;
+            }
+        } else if (carrier_ext == ".jpeg" || carrier_ext == ".jpg"){
+            if (stega.dctJpeg(current_time)){
+                std::cout << "File " << current_time << " created succesfully" << std::endl;
+            }
+        } else {
+            // fallback to png LSB (may fail for unsupported carriers)
+            if (stega.pngLsb(current_time)){
+                std::cout << "File " << current_time << " created succesfully" << std::endl;
+            }
         }
     }
     
     Decoder saur = Decoder(current_time);
     if(saur.openEncodedFile()){
-        if(saur.pngDecode("decode"))
-        {
+        // choose decode path based on encoded file extension
+        size_t pos = current_time.rfind('.');
+        std::string ext = ".png";
+        if (pos != std::string::npos) ext = current_time.substr(pos);
+        bool ok = false;
+        if (ext == ".png"){
+            ok = saur.pngDecode("decode");
+        } else if (ext == ".jpeg" || ext == ".jpg"){
+            ok = saur.jpegDecode("decode");
+        } else {
+            // fallback to png decoder
+            ok = saur.pngDecode("decode");
+        }
+        if (ok){
             std::cout << "decoded!" << std::endl;
         }
     }
