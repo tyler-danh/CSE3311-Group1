@@ -4,6 +4,9 @@
         "forward_list": "cpp",
         "list": "cpp",
         "vector": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "xiosbase": "cpp",
+        "filesystem": "cpp",
+        "ostream": "cpp"
     }
 }

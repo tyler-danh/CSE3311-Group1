@@ -1,6 +1,12 @@
+<<<<<<< Updated upstream
 CXX = clang++
 CXXFLAGS = -std=c++17 -Wall -Wextra $(shell pkg-config --cflags libpng zlib)
 LDFLAGS = $(shell pkg-config --libs libpng zlib)
+=======
+CXX ?= g++
+CXXFLAGS = -std=c++17 -Wall -Wextra $(shell pkg-config --cflags libpng zlib libjpeg)
+LDFLAGS = $(shell pkg-config --libs libpng zlib libjpeg)
+>>>>>>> Stashed changes
 
 SRCDIR = steganography
 SOURCES = $(SRCDIR)/handler.cpp $(SRCDIR)/encoder.cpp $(SRCDIR)/decoder.cpp $(SRCDIR)/demo.cpp
