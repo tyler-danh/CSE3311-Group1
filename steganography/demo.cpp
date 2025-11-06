@@ -70,11 +70,21 @@ int main(){
                 // if carrier was .jpg prefer .jpg for Windows users
                 if (carrier.find(".jpg") != std::string::npos){
                     std::string preferred = out_base + ".jpg";
-                    if (std::rename(created.c_str(), preferred.c_str()) == 0){
+                    int r = std::rename(created.c_str(), preferred.c_str());
+                    if (r == 0){
                         final_out = preferred;
                     } else {
-                        // rename failed, keep created name but notify
-                        std::cerr << "Warning: failed to rename " << created << " to " << preferred << "." << std::endl;
+                        // if rename failed, check whether the preferred file already exists (maybe created by OS or another process).
+                        if (std::filesystem::exists(preferred)){
+                            // preferred exists, consider it a success
+                            final_out = preferred;
+                        } else if (!std::filesystem::exists(created)){
+                            // neither created nor preferred exists, something went wrong
+                            std::cerr << "Warning: failed to rename " << created << " to " << preferred << "." << std::endl;
+                        } else {
+                            // created exists but rename failed for some reason; keep created and warn
+                            std::cerr << "Warning: failed to rename " << created << " to " << preferred << "." << std::endl;
+                        }
                     }
                 }
                 std::cout << "Console: " << carrier << " successfully encoded and written to " << final_out << std::endl;
