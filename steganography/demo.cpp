@@ -7,15 +7,15 @@
 #include <algorithm>
 #include <filesystem>
 
-//forward declarations for mode functions
+// Forward declarations for mode functions
 bool encodeNonInteractive(const std::string& carrier, const std::string& secret, const std::string& output_base);
 bool decodeNonInteractive(const std::string& encoded, const std::string& output_base);
 void runInteractiveMode();
 
 int main(int argc, char* argv[]){
-    //non-interactive mode for Streamlit integration
+    // Non-interactive mode for Streamlit integration
     if (argc == 5 && std::string(argv[1]) == "encode") {
-    //encode mode: ./stegasaur encode <carrier> <secret> <output_base>
+        // Encode mode: ./stegasaur encode <carrier> <secret> <output_base>
         std::string carrier = argv[2];
         std::string secret = argv[3];
         std::string output_base = argv[4];
@@ -27,7 +27,7 @@ int main(int argc, char* argv[]){
         }
     }
     else if (argc == 4 && std::string(argv[1]) == "decode") {
-    //decode mode: ./stegasaur decode <encoded> <output_base>
+        // Decode mode: ./stegasaur decode <encoded> <output_base>
         std::string encoded = argv[2];
         std::string output_base = argv[3];
         
@@ -38,12 +38,12 @@ int main(int argc, char* argv[]){
         }
     }
     else if (argc == 1) {
-    //interactive mode
+        // Interactive mode
         runInteractiveMode();
         return 0;
     }
     else {
-    //invalid arguments
+        // Invalid arguments
         std::cerr << "ERR_INVALID_ARGUMENTS: Invalid command-line arguments provided" << std::endl;
         std::cerr << std::endl;
         std::cerr << "Usage:" << std::endl;
@@ -65,7 +65,7 @@ bool encodeNonInteractive(const std::string& carrier, const std::string& secret,
         return false;
     }
     
-    //determine carrier type and encode accordingly (case-insensitive)
+    // Determine carrier type and encode accordingly (case-insensitive)
     std::string carrier_lower = carrier;
     for (char &c : carrier_lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     
@@ -81,14 +81,14 @@ bool encodeNonInteractive(const std::string& carrier, const std::string& secret,
         success = stega.pngLsb(output_file);  // WAV uses same LSB method
     }
     else if (carrier_lower.find(".jpeg") != std::string::npos || carrier_lower.find(".jpg") != std::string::npos) {
-    //dctJpeg appends .jpeg internally
+        // dctJpeg appends .jpeg internally
         success = stega.dctJpeg(output_base);
         
-    //determine actual output filename
+        // Determine actual output filename
         std::string created = output_base + ".jpeg";
         output_file = created;
         
-    //if carrier was .jpg, rename to .jpg for consistency
+        // If carrier was .jpg, rename to .jpg for consistency
         if (carrier.find(".jpg") != std::string::npos) {
             std::string preferred = output_base + ".jpg";
             if (std::rename(created.c_str(), preferred.c_str()) == 0) {
@@ -103,7 +103,7 @@ bool encodeNonInteractive(const std::string& carrier, const std::string& secret,
     }
     
     if (success) {
-    //print only the output filename to stdout
+        // Print only the output filename to stdout
         std::cout << output_file << std::endl;
         return true;
     } else {
@@ -122,7 +122,7 @@ bool decodeNonInteractive(const std::string& encoded, const std::string& output_
         return false;
     }
     
-    //determine file type and decode accordingly (case-insensitive)
+    // Determine file type and decode accordingly (case-insensitive)
     std::string encoded_lower = encoded;
     for (char &c : encoded_lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     
@@ -141,9 +141,9 @@ bool decodeNonInteractive(const std::string& encoded, const std::string& output_
     }
     
     if (success) {
-    //the decoder methods append the extension internally based on extracted metadata
-    //we output just the base name - the frontend will need to check what file was created
-    //common extensions are .txt, .png, .jpeg, .jpg
+        // The decoder methods append the extension internally based on extracted metadata
+        // We output just the base name - the frontend will need to check what file was created
+        // Common extensions are .txt, .png, .jpeg, .jpg
         std::cout << output_base << std::endl;
         return true;
     } else {
@@ -181,7 +181,7 @@ void runInteractiveMode() {
                 continue;
             }
             
-            //build output path inside the same directory as the carrier (if carrier had a path)
+            // Build output path inside the same directory as the carrier (if carrier had a path)
             std::string out_base = new_file;
             size_t sep_pos = carrier.find_last_of("\\/");
             if (sep_pos != std::string::npos){
@@ -208,21 +208,21 @@ void runInteractiveMode() {
             }
             else if (carrier.find(".jpeg") != std::string::npos || carrier.find(".jpg") != std::string::npos){
                 std::cout << "Console: JPEG Carrier detected. Beginning JPEG DCT method." << std::endl;
-                //dctJpeg will append .jpeg internally; pass base path (no ext)
+                // dctJpeg will append .jpeg internally; pass base path (no ext)
                 if (!stega.dctJpeg(out_base)){
                     std::cout << "Console: Aborting encoder." << std::endl;
                     continue;
                 }
-                //actual file created will be out_base + ".jpeg"
+                // actual file created will be out_base + ".jpeg"
                 std::string created = out_base + ".jpeg";
                 std::string final_out = created;
-                //if carrier was .jpg prefer .jpg for Windows users
+                // if carrier was .jpg prefer .jpg for Windows users
                 if (carrier.find(".jpg") != std::string::npos){
                     std::string preferred = out_base + ".jpg";
                     if (std::rename(created.c_str(), preferred.c_str()) == 0){
                         final_out = preferred;
                     } else {
-                        //rename failed, keep created name but notify
+                        // rename failed, keep created name but notify
                         std::cerr << "Warning: failed to rename " << created << " to " << preferred << "." << std::endl;
                     }
                 }

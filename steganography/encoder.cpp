@@ -41,24 +41,21 @@ bool Encoder::openFiles(){
         carrier_data = carrier_file.getWavSampleData();
     }
     else if(carrier_file.getExt() == ".jpeg" or carrier_file.getExt() == ".jpg"){
-    //read JPEG pixel data so encoding methods that expect pixel bytes have data
+        // read JPEG pixel data so encoding methods that expect pixel bytes have data
         carrier_check = carrier_file.readJpeg();
         carrier_data = carrier_file.getPixelData();
     }
     if (secret_check == false or carrier_check == false){
         if (secret_check == false and carrier_check == false){
-            std::cerr << "ERR_FILE_NOT_FOUND: Failed to open secret file '" << secret_name << "' and carrier file '" << carrier_name << "'" << std::endl;
-            std::cerr << "Suggestion: Verify both file paths are correct and the files exist" << std::endl;
+            std::cerr << "Error: Failed to open secret file and carrier file" << std::endl;
             return false;
         }
         else if (secret_check == false){
-            std::cerr << "ERR_FILE_NOT_FOUND: Failed to open secret file '" << secret_name << "'" << std::endl;
-            std::cerr << "Suggestion: Verify the secret file path is correct and the file exists" << std::endl;
+            std::cerr << "Error: Failed to open secret file" << std::endl;
             return false;
         }
         else if (carrier_check == false){
-            std::cerr << "ERR_FILE_NOT_FOUND: Failed to open carrier file '" << carrier_name << "'" << std::endl;
-            std::cerr << "Suggestion: Verify the carrier file path is correct and the file exists" << std::endl;
+            std::cerr << "Error: Failed to open carrier file" << std::endl;
             return false;
         }
     }
@@ -97,10 +94,9 @@ bool Encoder::pngLsb(std::string newFile){
     std::streamsize secret_size = secret_file.getFileSize();
     //ext len + ext chars + datasize of the file size + actual file size (in bytes) -> times 8 bits
     std::streamsize required_bytes = (1 + static_cast<std::streamsize>(secret_ext.length()) + static_cast<std::streamsize>(secret_size)) * 8;
-    //ensure carrier_data buffer has enough bytes to hold required bits
+    // ensure carrier_data buffer has enough bytes to hold required bits
     if (required_bytes > static_cast<std::streamsize>(carrier_data.size())){
-        std::cerr << "ERR_FILE_TOO_LARGE: Secret file '" << secret_name << "' (" << secret_size << " bytes) is too large for carrier file '" << carrier_name << "' (capacity: " << carrier_data.size() / 8 << " bytes)" << std::endl;
-        std::cerr << "Suggestion: Use a larger carrier file or compress/reduce the size of your secret file" << std::endl;
+        std::cout << "Error: Secret file is too large." << std::endl;
         return false;
     }
 
@@ -139,11 +135,11 @@ bool Encoder::pngLsb(std::string newFile){
         
     }
     if (secret_ext == ".png" or secret_ext == ".jpeg" or secret_ext == ".jpg"){
-    //encode the image's dimensions
-    //height first
-    //width next
+        //encode the image's dimensions
+        //height first
+        //width next
         unsigned char* secret_height_bytes = reinterpret_cast<unsigned char*>(&secret_height);
-    //changed std::streamsize to size_t for sizeof compatibility
+        //changed std::streamsize to size_t for sizeof compatibility
         for (size_t i = 0; i < sizeof(secret_height); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = (secret_height_bytes[i] >> j) & 1;
@@ -154,7 +150,7 @@ bool Encoder::pngLsb(std::string newFile){
         }
 
         unsigned char* secret_width_bytes = reinterpret_cast<unsigned char*>(&secret_width);
-    //changed std::streamsize to size_t for sizeof compatibility
+        //changed std::streamsize to size_t for sizeof compatibility
         for (size_t i = 0; i < sizeof(secret_width); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = (secret_width_bytes[i] >> j) & 1;
@@ -184,13 +180,13 @@ bool Encoder::pngLsb(std::string newFile){
             offset++;
         }
     }
-    //update handler carrier file obj with encoded data and write new file
+    // update handler carrier file obj with encoded data and write new file
     if (carrier_file.getExt() == ".png"){
         carrier_file.setPngPixelData(carrier_data);
         carrier_file.writePng(newFile);
     }
     else if (carrier_file.getExt() == ".wav"){
-    //carrier_data currently contains the raw file bytes read by readFile(); need to replace the wav samples
+        // carrier_data currently contains the raw file bytes read by readFile(); need to replace the wav samples
         carrier_file.setWavSampleData(carrier_data);
         carrier_file.writeWav(newFile);
     }
@@ -206,14 +202,12 @@ bool Encoder::dctJpeg(std::string newFile){
     decompress_info.err = jpeg_std_error(&jpeg_error);
 
     if(carrier_check == false){
-        std::cerr << "ERR_FILE_NOT_FOUND: Carrier file '" << carrier_name << "' is not valid" << std::endl;
-        std::cerr << "Suggestion: Verify the carrier file path is correct and the file exists" << std::endl;
+        std::cerr << "Error: Carrier file not valid" << std::endl;
         return false;
     }
     FILE* jpeg_file = fopen(carrier_name.c_str(), "rb");
     if(!jpeg_file){
-        std::cerr << "ERR_FILE_OPEN_FAILED: Failed to open carrier file '" << carrier_name << "'" << std::endl;
-        std::cerr << "Suggestion: Verify you have read permissions for the carrier file" << std::endl;
+        std::cerr << "Error: " << carrier_name << " failed to open" << std::endl;
         return false;
     }
 
@@ -224,8 +218,7 @@ bool Encoder::dctJpeg(std::string newFile){
     //read coefficients for DCT
     jvirt_barray_ptr* coefficients = jpeg_read_coefficients(&decompress_info);
     if (!coefficients){
-        std::cerr << "ERR_JPEG_READ_FAILED: Failed to read JPEG DCT coefficients from '" << carrier_name << "'" << std::endl;
-        std::cerr << "Suggestion: The JPEG file may be corrupted or in an unsupported format" << std::endl;
+        std::cerr << "Error: Failed to read JPEG coefficients." << std::endl;
         return false;
     }
 
@@ -233,18 +226,17 @@ bool Encoder::dctJpeg(std::string newFile){
     struct jpeg_compress_struct compress_info;
     compress_info.err = jpeg_std_error(&jpeg_error);
     jpeg_create_compress(&compress_info);
-    //if newFile already ends with .jpeg or .jpg, don't append
+    // if newFile already ends with .jpeg or .jpg, don't append
     if (!(newFile.size() >= 5 && (newFile.rfind(".jpeg") == newFile.size() - 5)) &&
         !(newFile.size() >= 4 && (newFile.rfind(".jpg") == newFile.size() - 4))) {
-    //choose extension to append based on carrier's extension to preserve original style
+        // choose extension to append based on carrier's extension to preserve original style
         std::string jpeg_ext = ".jpeg";
         if (carrier_file.getExt() == ".jpg") jpeg_ext = ".jpg";
         newFile = newFile + jpeg_ext;
     }
     FILE* output_file = fopen(newFile.c_str(), "wb");
     if (!output_file){
-        std::cerr << "ERR_FILE_OPEN_FAILED: Failed to open '" << newFile << "' for writing JPEG" << std::endl;
-        std::cerr << "Suggestion: Check that you have write permissions in the target directory" << std::endl;
+        std::cerr << "Failed to open " << newFile << "for writing JPEG" << std::endl;
         return false;
     }
     jpeg_stdio_dest(&compress_info, output_file);
@@ -256,8 +248,7 @@ bool Encoder::dctJpeg(std::string newFile){
     std::string secret_ext = secret_file.getExt();
     std::uint8_t ext_len = static_cast<uint8_t>(secret_ext.length());
     unsigned char* ext_len_bytes = reinterpret_cast<unsigned char*>(&ext_len);
-    //fix: use std::streamsize (8 bytes) to match decoder expectation
-    std::streamsize secret_size = secret_data.size();
+    uint32_t secret_size = secret_data.size();
     unsigned char* size_bytes = reinterpret_cast<unsigned char*>(&secret_size);
     uint16_t checksum = generateChecksum();
     unsigned char* checksum_bytes = reinterpret_cast<unsigned char*>(&checksum);
@@ -289,11 +280,11 @@ bool Encoder::dctJpeg(std::string newFile){
         for (JDIMENSION block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks && !finished_enc; ++block_y) {
             JBLOCKARRAY block_array = (decompress_info.mem->access_virt_barray)((j_common_ptr)&decompress_info, coefficients[comp_i], block_y, 1, FALSE);
             for (JDIMENSION block_x = 0; block_x < decompress_info.comp_info[comp_i].width_in_blocks && !finished_enc; ++block_x) {
-                    //each block has 64 coefficients
+                //each block has 64 coefficients
                 for (int i = 0; i < DCTSIZE2; ++i) {
                     JCOEF* coef_ptr = &block_array[0][block_x][i];
 
-                    //steg rule: only embed in coefficients that are not 0 or 1
+                    //Steg Rule: only embed in coefficients that are not 0 or 1
                     if (*coef_ptr != 0 && *coef_ptr != 1) {
                         //get the current bit to hide
                         unsigned char current_byte = secret_payload[data_byte_index];
@@ -318,9 +309,7 @@ bool Encoder::dctJpeg(std::string newFile){
         }
     }
     if(!finished_enc){
-        std::streamsize secret_size = secret_file.getFileSize();
-        std::cerr << "ERR_FILE_TOO_LARGE: Secret file '" << secret_name << "' (" << secret_size << " bytes) is too large for JPEG carrier '" << carrier_name << "' (insufficient DCT coefficients)" << std::endl;
-        std::cerr << "Suggestion: JPEG carriers have lower capacity than PNG. Use a larger JPEG, a smaller secret, or switch to PNG" << std::endl;
+        std::cerr << "Error: Secret file is too large." << std::endl;
         jpeg_finish_compress(&compress_info);
         jpeg_destroy_compress(&compress_info);
         fclose(output_file);

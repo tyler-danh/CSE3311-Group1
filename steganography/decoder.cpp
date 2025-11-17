@@ -30,8 +30,7 @@ bool Decoder::openEncodedFile(){
         file_check = true;
     }
     if (file_check == false){
-        std::cerr << "ERR_FILE_NOT_FOUND: Encoded file '" << encoded_name << "' failed to open" << std::endl;
-        std::cerr << "Suggestion: Verify the file path is correct and the file exists" << std::endl;
+        std::cerr << "Error: Encoded file failed to open" << std::endl;
         return false;
     }
     return true;
@@ -61,8 +60,7 @@ bool Decoder::pngDecode(std::string newFile){
     std::cout << checksum;
     checksum = extracted_byte;
     if(!checksumCheck(checksum)){
-        std::cerr << "ERR_INVALID_CHECKSUM: Checksum validation failed for '" << encoded_name << "'. File may not contain StegaSaur-encoded data or has been corrupted (checksum: " << checksum << ")" << std::endl;
-        std::cerr << "Suggestion: Ensure this file was encoded with StegaSaur and has not been modified or recompressed" << std::endl;
+        std::cerr << "Error: Checksum has been tampered with or invalid." << "\n The file does not contained encoded data, has not been encoded with StegaSaur, or encoded data has been tampered with." << std::endl;
         return false;
     }
     else{
@@ -77,8 +75,7 @@ bool Decoder::pngDecode(std::string newFile){
     }
     ext_len = extracted_byte;
     if(ext_len == 0){
-        std::cerr << "ERR_CORRUPTED_DATA: Could not read extension length from '" << encoded_name << "'" << std::endl;
-        std::cerr << "Suggestion: The file may be corrupted or not encoded with StegaSaur" << std::endl;
+        std::cerr << "Error: Could not read extension length" << std::endl;
         return false;
     }
     extracted_byte = 0; //clear extracted byte
@@ -96,8 +93,7 @@ bool Decoder::pngDecode(std::string newFile){
     }
     std::cout << "Console: Succesfully extracted file extension: " << file_ext << std::endl;
     if (file_ext != ".txt" and file_ext != ".png" and file_ext != ".jpeg" and file_ext != ".jpg"){
-        std::cerr << "ERR_INVALID_FILE_TYPE: Extracted file extension '" << file_ext << "' from '" << encoded_name << "' is not supported" << std::endl;
-        std::cerr << "Suggestion: StegaSaur currently supports .txt, .png, .jpeg, and .jpg files" << std::endl;
+        std::cerr << "CRITICAL ERROR: Extracted file extension is not valid. Aborting." << std::endl;
         return false;
     }
 
@@ -105,7 +101,7 @@ bool Decoder::pngDecode(std::string newFile){
     if (file_ext == ".png" or file_ext == ".jpeg" or file_ext == ".jpg"){
         std::cout << "Console: Image detected. Extracting dimensions." << std::endl;
         unsigned char* height_bytes = reinterpret_cast<unsigned char*>(&height);
-    //changed int to size_t for sizeof compatibility
+        //changed int to size_t for sizeof compatibility
             for (size_t i = 0; i < sizeof(height); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = file_data[offset] & 1;
@@ -118,7 +114,7 @@ bool Decoder::pngDecode(std::string newFile){
         std::cout << "Console: Extracted height: " << height << std::endl;
 
         unsigned char* width_bytes = reinterpret_cast<unsigned char*>(&width);
-    //changed int to size_t for sizeof compatibility
+        //changed int to size_t for sizeof compatibility
         for (size_t i = 0; i < sizeof(width); ++i){
             for (int j = 0; j < 8; ++j){
                 unsigned char bit = file_data[offset] & 1;
@@ -131,7 +127,7 @@ bool Decoder::pngDecode(std::string newFile){
         std::cout << "Console: Extracted width: " << width << std::endl;
     }
     //extract data size
-    std::streamsize data_size = 0;
+    uint32_t data_size = 0;
     unsigned char* size_bytes = reinterpret_cast<unsigned char*>(&data_size);
     //using data size of data_size for for loop
     //changed int to size_t for sizeof compatibility
@@ -145,8 +141,7 @@ bool Decoder::pngDecode(std::string newFile){
         extracted_byte = 0;
     }
     if (data_size == 0){
-        std::cerr << "ERR_CORRUPTED_DATA: Could not read data size from '" << encoded_name << "'" << std::endl;
-        std::cerr << "Suggestion: The file may be corrupted or not encoded with StegaSaur" << std::endl;
+        std::cerr << "Error: Could not read data size" << std::endl;
         return false;
     }
     else{
@@ -155,8 +150,8 @@ bool Decoder::pngDecode(std::string newFile){
 
     //extract file data based on data_size
     extracted_data.reserve(data_size);
-    //changed int to std::streamsize for data_size compatibility
-    for (std::streamsize i = 0; i < data_size; ++i){
+    //changed int to uint32_t for data_size compatibility
+    for (uint32_t i = 0; i < data_size; ++i){
         for (int j = 0; j < 8; ++j){
             unsigned char bit = file_data[offset] & 1;
             extracted_byte |= (bit << j);
@@ -170,8 +165,7 @@ bool Decoder::pngDecode(std::string newFile){
         encodedFile.setBinaryFileData(extracted_data);
         newFile = newFile + file_ext;
         if(!encodedFile.writeFile(newFile)){
-            std::cerr << "ERR_FILE_WRITE_FAILED: Failed to write extracted file '" << newFile << "' (" << extracted_data.size() << " bytes)" << std::endl;
-            std::cerr << "Suggestion: Ensure you have write permissions and sufficient disk space" << std::endl;
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }
     }
@@ -181,8 +175,7 @@ bool Decoder::pngDecode(std::string newFile){
         encodedFile.setImageDimensions(1, width);
         newFile = newFile + file_ext;
         if (!encodedFile.writePng(newFile)){
-            std::cerr << "ERR_FILE_WRITE_FAILED: Failed to write extracted PNG file '" << newFile << "' (" << width << "x" << height << ")" << std::endl;
-            std::cerr << "Suggestion: Ensure you have write permissions and sufficient disk space" << std::endl;
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }
     }
@@ -190,8 +183,7 @@ bool Decoder::pngDecode(std::string newFile){
         encodedFile.setBinaryFileData(extracted_data);
         newFile = newFile + file_ext;
         if(!encodedFile.writeFile(newFile)){
-            std::cerr << "ERR_FILE_WRITE_FAILED: Failed to write extracted WAV file '" << newFile << "' (" << extracted_data.size() << " bytes)" << std::endl;
-            std::cerr << "Suggestion: Ensure you have write permissions and sufficient disk space" << std::endl;
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }
     }
@@ -201,8 +193,7 @@ bool Decoder::pngDecode(std::string newFile){
         encodedFile.setImageDimensions(1, width);
         newFile = newFile + file_ext;
         if (!encodedFile.writeJpeg(newFile)){
-            std::cerr << "ERR_FILE_WRITE_FAILED: Failed to write extracted JPEG file '" << newFile << "' (" << width << "x" << height << ")" << std::endl;
-            std::cerr << "Suggestion: Ensure you have write permissions and sufficient disk space" << std::endl;
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }
     }
@@ -218,8 +209,7 @@ bool Decoder::jpegDecode(std::string newFile){
     //open encoded file
     FILE* encoded = fopen(encoded_name.c_str(), "rb");
     if (!encoded){
-        std::cerr << "ERR_FILE_OPEN_FAILED: Failed to open encoded JPEG file '" << encoded_name << "'" << std::endl;
-        std::cerr << "Suggestion: Verify the file exists and you have read permissions" << std::endl;
+        std::cerr << "Error: Failed to open " << encoded_name << std::endl;
         return false;
     }
     jpeg_create_decompress(&decompress_info);
@@ -229,8 +219,7 @@ bool Decoder::jpegDecode(std::string newFile){
     //read DCT coefficients
     jvirt_barray_ptr* coeffcients = jpeg_read_coefficients(&decompress_info);
     if (!coeffcients){
-        std::cerr << "ERR_JPEG_READ_FAILED: Failed to read DCT coefficients from '" << encoded_name << "'" << std::endl;
-        std::cerr << "Suggestion: The JPEG file may be corrupted or in an unsupported format" << std::endl;
+        std::cerr << "Error: Failed to read " << encoded_name << " DCT coefficients." << std::endl;
         return false;
     }
 
@@ -241,12 +230,12 @@ bool Decoder::jpegDecode(std::string newFile){
     //things we need to extract
     uint16_t checksum = 0;
     uint8_t ext_len = 0;
-    std::streamsize file_size = 0;
+    uint32_t file_size = 0;
     size_t total_size = 0;
     int height = 0, width = 0;
     bool parsed = false; //once we have enough data mark as true to stop iterating
 
-//jsteg extraction logic
+//JSTEG extraction logic
     for (int comp_i = 0; comp_i < decompress_info.num_components; ++comp_i){
         for (JDIMENSION block_y = 0; block_y < decompress_info.comp_info[comp_i].height_in_blocks; ++block_y) {
             JBLOCKARRAY block_array = (decompress_info.mem->access_virt_barray)((j_common_ptr)&decompress_info, coeffcients[comp_i], block_y, 1, FALSE);
@@ -256,7 +245,7 @@ bool Decoder::jpegDecode(std::string newFile){
 
                     //JSTEG Rule: Only extract from coefficients that are not 0 or 1
                     if (coef_val != 0 && coef_val != 1) {
-                        //extract LSB and add it to our byte
+                        // Extract LSB and add it to our byte
                         int bit = coef_val & 1;
                         current_byte |= (bit << bit_counter);
                         bit_counter++;
@@ -270,7 +259,7 @@ bool Decoder::jpegDecode(std::string newFile){
                                 //extracting currently has no verification, will be done later
                                 const size_t CHECKSUM_SIZE = sizeof(uint16_t); // 2
                                 const size_t EXT_LEN_SIZE = sizeof(uint8_t);  // 1
-                                const size_t FILE_SIZE_SIZE = sizeof(std::streamsize); // 8
+                                const size_t FILE_SIZE_SIZE = sizeof(uint32_t); // 4
                                 const size_t IMG_DIMS_SIZE = sizeof(int) * 2; // 8
 
                                 //check if we have the minimal header (checksum + ext_len)
@@ -320,8 +309,7 @@ bool Decoder::jpegDecode(std::string newFile){
     fclose(encoded);
 
     if (!parsed or extracted_data.size() != total_size){
-        std::cerr << "ERR_INCOMPLETE_EXTRACTION: Failed to extract complete data from '" << encoded_name << "'. File may not be StegaSaur-encoded (extracted: " << extracted_data.size() << " bytes, expected: " << total_size << " bytes)" << std::endl;
-        std::cerr << "Suggestion: Ensure the file was encoded with StegaSaur and has not been modified or recompressed" << std::endl;
+        std::cerr << "Error: Failed to extract complete package or file was not encoded using StegaSaur." << std::endl;
         return false;
     }
 
@@ -332,8 +320,7 @@ bool Decoder::jpegDecode(std::string newFile){
     memcpy(&checksum, &extracted_data[offset], sizeof(uint16_t));
     //check checksum
     if(!checksumCheck(checksum)){
-        std::cerr << "ERR_INVALID_CHECKSUM: Checksum validation failed for JPEG '" << encoded_name << "'. File may not contain StegaSaur-encoded data or has been corrupted (checksum: " << checksum << ")" << std::endl;
-        std::cerr << "Suggestion: Ensure this file was encoded with StegaSaur and has not been modified or recompressed" << std::endl;
+        std::cerr << "Error: Checksum has been tampered with or invalid." << "\n The file does not contained encoded data, has not been encoded with StegaSaur, or encoded data has been tampered with." << std::endl;
         return false;
     }
     else{
@@ -356,7 +343,7 @@ bool Decoder::jpegDecode(std::string newFile){
         std::cout << "Console: Extracted width: " << width << std::endl;
     }
     //get file size
-    memcpy(&file_size, &extracted_data[offset], sizeof(std::streamsize));
+    memcpy(&file_size, &extracted_data[offset], sizeof(uint32_t));
     offset += sizeof(file_size);
     //get file data
     file_data.insert(file_data.begin(), extracted_data.begin() + offset, extracted_data.end());
@@ -366,8 +353,6 @@ bool Decoder::jpegDecode(std::string newFile){
         newFile = newFile+file_ext;
         encodedFile.setBinaryFileData(file_data);
         if(!encodedFile.writeFile(newFile)){
-            std::cerr << "ERR_FILE_WRITE_FAILED: Failed to write extracted text file '" << newFile << "' (" << file_data.size() << " bytes)" << std::endl;
-            std::cerr << "Suggestion: Ensure you have write permissions and sufficient disk space" << std::endl;
             return false;
         }
         std::cout << "Console: Successfully extracted to " << newFile << std::endl;
@@ -379,8 +364,7 @@ bool Decoder::jpegDecode(std::string newFile){
         encodedFile.setImageDimensions(1, width);
         newFile = newFile + file_ext;
         if (!encodedFile.writePng(newFile)){
-            std::cerr << "ERR_FILE_WRITE_FAILED: Failed to write extracted PNG file '" << newFile << "' (" << width << "x" << height << ")" << std::endl;
-            std::cerr << "Suggestion: Ensure you have write permissions and sufficient disk space" << std::endl;
+            std::cerr << "Error: Failed to write to " << newFile << std::endl;
             return false;
         }
         std::cout << "Console: Successfully extracted to " << newFile << std::endl;

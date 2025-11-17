@@ -1,0 +1,35 @@
+# Compiled binaries
+stegasaur
+stegasaur.exe
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# Streamlit
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+test_output/
+*.encoded.*
+encoded_*
+decoded_*
+output.*
